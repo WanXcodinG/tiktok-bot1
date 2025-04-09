@@ -1,7 +1,7 @@
 # 🤖 TikTok Content Bot
 
 [![Node.js](https://img.shields.io/badge/Node.js-v16+-green.svg)](https://nodejs.org)
-[![License](https://img.shields.io/github/license/your-username/tiktok-content-bot)](LICENSE)
+[![License](https://img.shields.io/github/license/your-username/tiktok-bot)](LICENSE)
 [![Made With](https://img.shields.io/badge/Made%20With-JavaScript-yellow)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![TikTok Automation](https://img.shields.io/badge/Automation-TikTok-blueviolet)](#)
 
@@ -37,35 +37,44 @@
 ---
 
 ## 🧭 Project Structure
+```
+├── bot.js # Interactive CLI for user-driven posts 
+├── scheduler.js # Cron job for daily automated posts 
+├── fetch/ # Video grabbers for each category 
+├── edit/ # Editor & music overlay 
+├── upload/ # TikTok upload logic using Puppeteer 
+├── shared/ # Shared posting utility 
+├── utils/ # Caption generator, cleanup 
+├── videos/ # Raw and edited video folders 
+│ ├── raw/ 
+│ └── edited/ 
+├── .env # Contains TikTok session or secrets 
+└── index.js # Entrypoint (optional)
 
-. ├── bot.js # Interactive CLI for user-driven posts ├── scheduler.js # Cron job for daily automated posts ├── fetch/ # Video grabbers for each category ├── edit/ # Editor & music overlay ├── upload/ # TikTok upload logic using Puppeteer ├── shared/ # Shared posting utility ├── utils/ # Caption generator, cleanup ├── videos/ # Raw and edited video folders │ ├── raw/ │ └── edited/ ├── .env # Contains TikTok session or secrets └── index.js # Entrypoint (optional)
-
-
+```
 ---
 
 ## ⚙️ Setup
 
 1. **Clone the repo**
-   ```bash
-   git clone https://github.com/your-username/tiktok-content-bot.git
+   ```
+   git clone https://github.com/TA-wiah/tiktok-bot.git
    cd tiktok-content-bot
-Install dependencies
-
-
+   ```
+- Install dependencies
+```
 npm install
+
 Configure .env
+TIKTOK_SESSION=your_cookie_session
 
-
-TIKTOK_SESSION=your_cookie_session (if needed)
 Run interactively
-
-
 node bot.js
+
 Run scheduled tasks
-
-
 node scheduler.js
-🧠 Customization
+```
+# 🧠 Customization
 You can:
 
 ✨ Add more fetch categories (fetch/)
@@ -75,24 +84,27 @@ You can:
 🎵 Change or add music tracks in addMusicToVideo
 
 🧹 Auto Cleanup
+
 The bot runs a cron job every day at 3:00 AM to delete old videos:
+```
+cron.schedule("0 3 * * *", cleanup);
+```
+### 💡 Example Output
 
-
-cron.schedule("0 3 * * *", cleanup); 
-💡 Example Output
-less
-Copy
-Edit
 📱 TikTok Content Bot
 > You selected: Anime Edited Videos
-📥 Downloading video...
-🎬 Editing video...
-🎶 Adding music...
-📝 Generating caption...
-📤 Uploading to TikTok...
-🚀 Posted to TikTok!
-🙌 Contributing
-Forks, stars ⭐, issues, and pull requests are welcome!
 
-📜 License
-This project is licensed under the MIT License.
+📥 Downloading video...
+
+🎬 Editing video...
+
+🎶 Adding music...
+
+📝 Generating caption...
+
+📤 Uploading to TikTok...
+
+🚀 Posted to TikTok!
+
+## 🙌 Contributing
+Forks, stars ⭐, issues, and pull requests are welcome!

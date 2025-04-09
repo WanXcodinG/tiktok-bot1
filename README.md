@@ -59,7 +59,7 @@
 1. **Clone the repo**
    ```
    git clone https://github.com/TA-wiah/tiktok-bot.git
-   cd tiktok-content-bot
+   cd tiktok-bot
    ```
 - Install dependencies
 ```

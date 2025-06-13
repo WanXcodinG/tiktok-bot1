@@ -88,7 +88,7 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Download video from any supported platform - ENHANCED FILE DETECTION
+   * Download video from any supported platform - ENHANCED FILE DETECTION V2
    */
   async downloadVideo(url, options = {}) {
     try {
@@ -103,8 +103,8 @@ class MultiPlatformDownloader {
       const videoInfo = await this.getVideoInfo(url);
       const videoId = videoInfo.id;
       
-      // Get list of files BEFORE download
-      const filesBefore = this.getVideoFiles();
+      // Get DETAILED list of files BEFORE download with timestamps
+      const filesBefore = this.getDetailedVideoFiles();
       console.log(chalk.gray(`📁 Files before download: ${filesBefore.length}`));
       
       // Create unique filename with timestamp to avoid conflicts
@@ -137,30 +137,70 @@ class MultiPlatformDownloader {
         throw new Error(`Download failed: ${ytDlpError.message}`);
       }
       
-      // Get list of files AFTER download and find the new file
-      const filesAfter = this.getVideoFiles();
+      // Wait a moment for file system to update
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Get DETAILED list of files AFTER download with timestamps
+      const filesAfter = this.getDetailedVideoFiles();
       console.log(chalk.gray(`📁 Files after download: ${filesAfter.length}`));
       
-      // Find the newly downloaded file
-      const newFiles = filesAfter.filter(file => !filesBefore.includes(file));
-      
+      // Find the newly downloaded file using multiple strategies
       let downloadedFile = null;
+      
+      // Strategy 1: Find files that appeared after download (most reliable)
+      const newFiles = filesAfter.filter(fileAfter => {
+        return !filesBefore.some(fileBefore => 
+          fileBefore.name === fileAfter.name && 
+          Math.abs(fileBefore.mtime - fileAfter.mtime) < 5000 // Within 5 seconds
+        );
+      });
       
       if (newFiles.length > 0) {
         // Use the newest file from the new files
         const newestFile = newFiles.reduce((newest, current) => {
-          const currentPath = path.join(this.outputDir, current);
-          const newestPath = path.join(this.outputDir, newest);
-          const currentStats = fs.statSync(currentPath);
-          const newestStats = fs.statSync(newestPath);
-          return currentStats.mtime > newestStats.mtime ? current : newest;
+          return current.mtime > newest.mtime ? current : newest;
         });
         
-        downloadedFile = path.join(this.outputDir, newestFile);
-        console.log(chalk.green(`✅ Found new downloaded file: ${newestFile}`));
+        downloadedFile = newestFile.path;
+        console.log(chalk.green(`✅ Found new downloaded file: ${newestFile.name}`));
       } else {
-        // Fallback: search for files with video ID or timestamp
-        downloadedFile = await this.findDownloadedFile(videoId, platform, timestamp);
+        // Strategy 2: Look for files with the exact timestamp pattern
+        const timestampMatches = filesAfter.filter(file => {
+          return file.name.includes(timestamp.toString()) && 
+                 file.name.includes(videoId);
+        });
+        
+        if (timestampMatches.length > 0) {
+          downloadedFile = timestampMatches[0].path;
+          console.log(chalk.blue(`🔍 Found file with timestamp: ${timestampMatches[0].name}`));
+        } else {
+          // Strategy 3: Look for files with video ID that are very recent (last 2 minutes)
+          const recentTime = Date.now() - (2 * 60 * 1000); // 2 minutes ago
+          const recentMatches = filesAfter.filter(file => {
+            return file.name.toLowerCase().includes(videoId.toLowerCase()) &&
+                   file.mtime > recentTime;
+          });
+          
+          if (recentMatches.length > 0) {
+            // Use the most recent one
+            const mostRecent = recentMatches.reduce((newest, current) => {
+              return current.mtime > newest.mtime ? current : newest;
+            });
+            downloadedFile = mostRecent.path;
+            console.log(chalk.blue(`🔍 Found recent video ID match: ${mostRecent.name}`));
+          } else {
+            // Strategy 4: Look for ANY very recent file (absolute last resort)
+            const veryRecentFiles = filesAfter.filter(file => file.mtime > recentTime);
+            
+            if (veryRecentFiles.length > 0) {
+              const mostRecent = veryRecentFiles.reduce((newest, current) => {
+                return current.mtime > newest.mtime ? current : newest;
+              });
+              downloadedFile = mostRecent.path;
+              console.log(chalk.yellow(`⚠️ Using most recent file: ${mostRecent.name}`));
+            }
+          }
+        }
       }
       
       if (downloadedFile && fs.existsSync(downloadedFile)) {
@@ -214,6 +254,17 @@ class MultiPlatformDownloader {
           };
         }
       } else {
+        // Enhanced error reporting
+        console.error(chalk.red(`❌ No matching files found for video ID: ${videoId}`));
+        
+        // Debug: List all files in directory with details
+        const allFiles = this.getDetailedVideoFiles();
+        console.log(chalk.gray(`📁 Available files after download:`));
+        allFiles.forEach(file => {
+          const ageMinutes = Math.round((Date.now() - file.mtime) / (60 * 1000));
+          console.log(chalk.gray(`   - ${file.name} (${ageMinutes}min ago, ${(file.size / 1024 / 1024).toFixed(2)}MB)`));
+        });
+        
         throw new Error('Download completed but file not found');
       }
       
@@ -224,7 +275,44 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Get all video files in the output directory
+   * Get all video files with detailed information (name, path, mtime, size)
+   */
+  getDetailedVideoFiles() {
+    try {
+      if (!fs.existsSync(this.outputDir)) {
+        return [];
+      }
+      
+      const files = fs.readdirSync(this.outputDir).filter(file => {
+        const lowerFile = file.toLowerCase();
+        return (lowerFile.endsWith('.mp4') || 
+                lowerFile.endsWith('.webm') || 
+                lowerFile.endsWith('.mkv') ||
+                lowerFile.endsWith('.avi') ||
+                lowerFile.endsWith('.mov')) &&
+               !lowerFile.endsWith('.part') && // Skip partial downloads
+               !lowerFile.includes('.tmp'); // Skip temp files
+      });
+      
+      return files.map(file => {
+        const filePath = path.join(this.outputDir, file);
+        const stats = fs.statSync(filePath);
+        return {
+          name: file,
+          path: filePath,
+          mtime: stats.mtime.getTime(),
+          size: stats.size
+        };
+      }).sort((a, b) => b.mtime - a.mtime); // Sort by newest first
+      
+    } catch (err) {
+      console.error(chalk.red(`❌ Error getting detailed video files: ${err.message}`));
+      return [];
+    }
+  }
+
+  /**
+   * Get all video files in the output directory (simple version)
    */
   getVideoFiles() {
     try {
@@ -245,106 +333,6 @@ class MultiPlatformDownloader {
     } catch (err) {
       console.error(chalk.red(`❌ Error getting video files: ${err.message}`));
       return [];
-    }
-  }
-
-  /**
-   * Find downloaded file by searching for files with video ID - ENHANCED
-   */
-  async findDownloadedFile(videoId, platform, timestamp) {
-    try {
-      const files = this.getVideoFiles();
-      console.log(chalk.gray(`🔍 Searching among ${files.length} video files for: ${videoId}`));
-      
-      // Strategy 1: Look for files with exact timestamp pattern (most recent download)
-      const timestampMatches = files.filter(file => {
-        const lowerFile = file.toLowerCase();
-        return lowerFile.includes(videoId.toLowerCase()) && 
-               lowerFile.includes(timestamp.toString());
-      });
-      
-      if (timestampMatches.length > 0) {
-        console.log(chalk.green(`✅ Found file with timestamp: ${timestampMatches[0]}`));
-        return path.join(this.outputDir, timestampMatches[0]);
-      }
-      
-      // Strategy 2: Look for files with video ID from the last 10 minutes (recent downloads only)
-      const recentTime = Date.now() - (10 * 60 * 1000); // 10 minutes ago
-      const recentMatches = files.filter(file => {
-        const lowerFile = file.toLowerCase();
-        const lowerVideoId = videoId.toLowerCase();
-        const lowerPlatform = platform.toLowerCase();
-        const filePath = path.join(this.outputDir, file);
-        const stats = fs.statSync(filePath);
-        
-        return lowerFile.includes(lowerVideoId) &&
-               lowerFile.includes(lowerPlatform) &&
-               stats.mtime.getTime() > recentTime; // Only recent files
-      });
-      
-      if (recentMatches.length > 0) {
-        // Return the most recent file
-        const sortedFiles = recentMatches.map(file => ({
-          name: file,
-          path: path.join(this.outputDir, file),
-          stats: fs.statSync(path.join(this.outputDir, file))
-        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
-        
-        console.log(chalk.blue(`🔍 Found recent video ID match: ${sortedFiles[0].name}`));
-        return sortedFiles[0].path;
-      }
-      
-      // Strategy 3: Look for the most recent file with platform prefix (last resort)
-      const platformMatches = files.filter(file => {
-        const lowerFile = file.toLowerCase();
-        const lowerPlatform = platform.toLowerCase();
-        const filePath = path.join(this.outputDir, file);
-        const stats = fs.statSync(filePath);
-        
-        return lowerFile.startsWith(lowerPlatform) &&
-               stats.mtime.getTime() > recentTime; // Only recent files
-      });
-      
-      if (platformMatches.length > 0) {
-        // Return the most recent file
-        const sortedFiles = platformMatches.map(file => ({
-          name: file,
-          path: path.join(this.outputDir, file),
-          stats: fs.statSync(path.join(this.outputDir, file))
-        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
-        
-        console.log(chalk.yellow(`⚠️ Using most recent ${platform} file: ${sortedFiles[0].name}`));
-        return sortedFiles[0].path;
-      }
-      
-      // Strategy 4: Look for ANY recent video file (absolute last resort)
-      const allRecentFiles = files.filter(file => {
-        const filePath = path.join(this.outputDir, file);
-        const stats = fs.statSync(filePath);
-        return stats.mtime.getTime() > recentTime;
-      });
-      
-      if (allRecentFiles.length > 0) {
-        const sortedFiles = allRecentFiles.map(file => ({
-          name: file,
-          path: path.join(this.outputDir, file),
-          stats: fs.statSync(path.join(this.outputDir, file))
-        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
-        
-        console.log(chalk.yellow(`⚠️ Using most recent video file: ${sortedFiles[0].name}`));
-        return sortedFiles[0].path;
-      }
-      
-      console.error(chalk.red(`❌ No matching files found for video ID: ${videoId}`));
-      
-      // Debug: List all files in directory
-      console.log(chalk.gray(`📁 Available files: ${files.join(', ')}`));
-      
-      return null;
-      
-    } catch (err) {
-      console.error(chalk.red(`❌ Error finding downloaded file: ${err.message}`));
-      return null;
     }
   }
 

@@ -7,6 +7,7 @@ const { getMultiPlatformVideos } = require("./fetch/getMultiPlatformVideos");
 async function runInteractiveBot() {
   console.log(chalk.blueBright("📱 TikTok Multi-Platform Content Bot"));
   console.log(chalk.gray("Supports: YouTube, TikTok, Instagram, Facebook, Twitter"));
+  console.log(chalk.green("🎯 Improved Search - Get exactly what you search for!"));
 
   const { inputType } = await inquirer.prompt([
     {
@@ -15,7 +16,7 @@ async function runInteractiveBot() {
       message: "How do you want to get videos?",
       choices: [
         "🔗 Provide direct URLs",
-        "🔍 Search by keyword"
+        "🔍 Search by keyword (Exact Match)"
       ],
     },
   ]);
@@ -51,15 +52,18 @@ async function runInteractiveBot() {
       return;
     }
 
-  } else if (inputType === "🔍 Search by keyword") {
+  } else if (inputType === "🔍 Search by keyword (Exact Match)") {
     const { searchQuery } = await inquirer.prompt([
       {
         type: "input",
         name: "searchQuery",
-        message: "Enter search keywords:",
+        message: "Enter search keywords (be specific for better results):",
         validate: input => input.trim().length > 0 || "Please enter search keywords"
       },
     ]);
+
+    console.log(chalk.cyan(`🎯 Searching for videos that match: "${searchQuery}"`));
+    console.log(chalk.gray("💡 Tip: Use specific keywords for better matching"));
 
     try {
       results = await getMultiPlatformVideos(searchQuery, {
@@ -68,11 +72,22 @@ async function runInteractiveBot() {
         quality: 1080
       });
 
-      // Add video ID
+      // Add video ID and search metadata
       results = results.map(result => ({
         ...result,
-        videoId: result.actualVideoId || result.id || result.videoId
+        videoId: result.actualVideoId || result.id || result.videoId,
+        searchQuery: searchQuery
       }));
+
+      // Show search results info
+      if (results.length > 0) {
+        const video = results[0];
+        console.log(chalk.green(`✅ Found matching video:`));
+        console.log(chalk.blue(`   📺 Title: ${video.title}`));
+        console.log(chalk.gray(`   🎯 Relevance Score: ${video.relevanceScore || 'N/A'}`));
+        console.log(chalk.gray(`   📊 Search Rank: #${video.searchRank || 1}`));
+        console.log(chalk.gray(`   ⏱️ Duration: ${video.duration || 'Unknown'}s`));
+      }
 
       hashtags = "viral, fyp, trending, content";
       
@@ -97,6 +112,10 @@ async function runInteractiveBot() {
   console.log(chalk.gray(`📱 Platform: ${video.platform}`));
   console.log(chalk.gray(`📁 File: ${video.localPath}`));
   console.log(chalk.gray(`🆔 Video ID: ${videoId}`));
+  
+  if (video.searchQuery) {
+    console.log(chalk.magenta(`🔍 Search Query: "${video.searchQuery}"`));
+  }
 
   // PROTECT THE DOWNLOADED FILE FROM CLEANUP
   if (video.localPath) {
@@ -177,6 +196,10 @@ async function runInteractiveBot() {
     console.log(chalk.cyan(`📊 Summary:`));
     console.log(chalk.gray(`   Title: ${video.title}`));
     console.log(chalk.gray(`   Platform: ${video.platform}`));
+    if (video.searchQuery) {
+      console.log(chalk.gray(`   Search Query: "${video.searchQuery}"`));
+      console.log(chalk.gray(`   Relevance Score: ${video.relevanceScore || 'N/A'}`));
+    }
     console.log(chalk.gray(`   Caption: ${caption}`));
 
   } catch (err) {

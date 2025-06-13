@@ -416,7 +416,7 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Search and download from YouTube using yt-search
+   * Search and download from YouTube - IMPROVED SEARCH ACCURACY
    */
   async searchAndDownload(query, platform = 'YouTube', limit = 1) {
     try {
@@ -430,38 +430,144 @@ class MultiPlatformDownloader {
         throw new Error(`Search only supported for YouTube. For other platforms, please provide direct URLs.`);
       }
 
-      // Use yt-search for YouTube search
+      // Use yt-search for YouTube search with improved filtering
       const searchResults = await yts(query);
-      const videos = searchResults.videos.slice(0, limit);
-
-      if (!videos || videos.length === 0) {
+      
+      if (!searchResults.videos || searchResults.videos.length === 0) {
         throw new Error(`No videos found for query: ${query}`);
       }
 
-      console.log(chalk.green(`🎯 Found ${videos.length} video(s)`));
+      console.log(chalk.cyan(`🎯 Found ${searchResults.videos.length} total results`));
 
-      const downloadResults = [];
-      for (const video of videos) {
-        try {
-          console.log(chalk.cyan(`📥 Processing: ${video.title}`));
-          const downloadResult = await this.downloadVideo(video.url);
-          downloadResults.push(downloadResult);
-        } catch (err) {
-          console.error(chalk.red(`❌ Failed to download ${video.title}: ${err.message}`));
-          downloadResults.push({
-            url: video.url,
-            title: video.title,
-            error: err.message,
-            success: false
-          });
-        }
+      // IMPROVED: Filter videos to match search intent better
+      const filteredVideos = this.filterSearchResults(searchResults.videos, query, limit);
+      
+      if (filteredVideos.length === 0) {
+        console.log(chalk.yellow('⚠️ No videos matched the search criteria, using top results'));
+        // Fallback to top results if filtering is too strict
+        const fallbackVideos = searchResults.videos.slice(0, limit);
+        return await this.downloadFilteredVideos(fallbackVideos, query);
       }
 
-      return downloadResults.filter(result => !result.error);
+      console.log(chalk.green(`✅ Selected ${filteredVideos.length} video(s) matching: "${query}"`));
+      
+      return await this.downloadFilteredVideos(filteredVideos, query);
+
     } catch (err) {
       console.error(chalk.red(`❌ Search and download failed: ${err.message}`));
       throw err;
     }
+  }
+
+  /**
+   * Filter search results to better match user intent - NEW METHOD
+   */
+  filterSearchResults(videos, query, limit) {
+    const queryWords = query.toLowerCase().split(' ').filter(word => word.length > 2);
+    
+    // Score videos based on relevance
+    const scoredVideos = videos.map(video => {
+      const title = video.title.toLowerCase();
+      const description = (video.description || '').toLowerCase();
+      const uploader = video.author?.name?.toLowerCase() || '';
+      
+      let score = 0;
+      
+      // Title matching (highest weight)
+      queryWords.forEach(word => {
+        if (title.includes(word)) {
+          score += 10;
+        }
+        // Partial matches
+        if (title.includes(word.substring(0, Math.max(3, word.length - 1)))) {
+          score += 5;
+        }
+      });
+      
+      // Description matching (medium weight)
+      queryWords.forEach(word => {
+        if (description.includes(word)) {
+          score += 3;
+        }
+      });
+      
+      // Uploader matching (low weight)
+      queryWords.forEach(word => {
+        if (uploader.includes(word)) {
+          score += 1;
+        }
+      });
+      
+      // Bonus for exact phrase match
+      if (title.includes(query.toLowerCase())) {
+        score += 20;
+      }
+      
+      // Penalty for very long videos (over 30 minutes)
+      const duration = video.duration?.seconds || 0;
+      if (duration > 1800) {
+        score -= 5;
+      }
+      
+      // Bonus for reasonable duration (1-20 minutes)
+      if (duration >= 60 && duration <= 1200) {
+        score += 2;
+      }
+      
+      return {
+        ...video,
+        relevanceScore: score
+      };
+    });
+    
+    // Sort by relevance score and take top results
+    const sortedVideos = scoredVideos
+      .filter(video => video.relevanceScore > 0) // Only videos with some relevance
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, limit);
+    
+    // Log the selection process
+    console.log(chalk.gray(`📊 Top matches:`));
+    sortedVideos.slice(0, 3).forEach((video, index) => {
+      console.log(chalk.gray(`   ${index + 1}. "${video.title}" (Score: ${video.relevanceScore})`));
+    });
+    
+    return sortedVideos;
+  }
+
+  /**
+   * Download filtered videos - NEW METHOD
+   */
+  async downloadFilteredVideos(videos, originalQuery) {
+    const downloadResults = [];
+    
+    for (const video of videos) {
+      try {
+        console.log(chalk.cyan(`📥 Processing: ${video.title}`));
+        console.log(chalk.gray(`🎯 Relevance score: ${video.relevanceScore || 'N/A'}`));
+        console.log(chalk.gray(`⏱️ Duration: ${video.duration?.timestamp || 'Unknown'}`));
+        
+        const downloadResult = await this.downloadVideo(video.url);
+        
+        // Add search metadata
+        downloadResult.searchQuery = originalQuery;
+        downloadResult.relevanceScore = video.relevanceScore;
+        downloadResult.searchRank = videos.indexOf(video) + 1;
+        
+        downloadResults.push(downloadResult);
+      } catch (err) {
+        console.error(chalk.red(`❌ Failed to download ${video.title}: ${err.message}`));
+        downloadResults.push({
+          url: video.url,
+          title: video.title,
+          error: err.message,
+          success: false,
+          searchQuery: originalQuery
+        });
+      }
+    }
+
+    return downloadResults.filter(result => !result.error);
   }
 
   /**

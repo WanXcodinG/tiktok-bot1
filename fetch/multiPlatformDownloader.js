@@ -88,7 +88,7 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Download video from any supported platform - FIXED
+   * Download video from any supported platform - IMPROVED FILE DETECTION
    */
   async downloadVideo(url, options = {}) {
     try {
@@ -111,10 +111,10 @@ class MultiPlatformDownloader {
       console.log(chalk.yellow(`⬇️ Downloading: ${videoInfo.title}`));
       console.log(chalk.gray(`📁 Output template: ${outputTemplate}`));
       
-      // Download options based on platform - FIXED: Remove duplicates
+      // Download options based on platform
       const downloadOptions = this.getDownloadOptions(platform, options);
       
-      // Execute download with proper error handling - FIXED: Clean command array
+      // Execute download with proper error handling
       const command = [
         url,
         '-o', outputTemplate,
@@ -133,7 +133,7 @@ class MultiPlatformDownloader {
         throw new Error(`Download failed: ${ytDlpError.message}`);
       }
       
-      // Find the downloaded file - IMPROVED
+      // Find the downloaded file - IMPROVED DETECTION
       const downloadedFile = await this.findDownloadedFile(videoId, platform, timestamp);
       
       if (downloadedFile && fs.existsSync(downloadedFile)) {
@@ -141,28 +141,43 @@ class MultiPlatformDownloader {
         console.log(chalk.green(`✅ Downloaded successfully! Size: ${(stats.size / 1024 / 1024).toFixed(2)}MB`));
         console.log(chalk.green(`📁 File location: ${downloadedFile}`));
         
-        // Create a consistent filename for easier reference
+        // Create a consistent filename for easier reference - FIXED LOGIC
         const finalFilename = `${platform.toLowerCase()}_${videoId}.mp4`;
         const finalPath = path.join(this.outputDir, finalFilename);
         
-        // If the downloaded file has a different name, rename it
-        if (downloadedFile !== finalPath) {
-          try {
+        // Always rename to consistent format for easier processing
+        try {
+          if (downloadedFile !== finalPath) {
             await fs.move(downloadedFile, finalPath, { overwrite: true });
             console.log(chalk.blue(`📝 Renamed to: ${finalFilename}`));
-          } catch (renameErr) {
-            console.log(chalk.yellow(`⚠️ Could not rename file: ${renameErr.message}`));
-            // Use the original downloaded file path
           }
+          
+          // Verify the final file exists
+          if (!fs.existsSync(finalPath)) {
+            throw new Error('File rename failed - final file not found');
+          }
+          
+          return {
+            ...videoInfo,
+            localPath: finalPath, // Always use the consistent final path
+            fileSize: stats.size,
+            alreadyExists: false,
+            actualVideoId: videoId,
+            originalDownloadPath: downloadedFile // Keep track of original path
+          };
+          
+        } catch (renameErr) {
+          console.log(chalk.yellow(`⚠️ Could not rename file: ${renameErr.message}`));
+          // If rename fails, use the original downloaded file path
+          return {
+            ...videoInfo,
+            localPath: downloadedFile,
+            fileSize: stats.size,
+            alreadyExists: false,
+            actualVideoId: videoId,
+            originalDownloadPath: downloadedFile
+          };
         }
-        
-        return {
-          ...videoInfo,
-          localPath: fs.existsSync(finalPath) ? finalPath : downloadedFile,
-          fileSize: stats.size,
-          alreadyExists: false,
-          actualVideoId: videoId // Store the actual video ID used
-        };
       } else {
         throw new Error('Download completed but file not found');
       }
@@ -174,14 +189,14 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Find downloaded file by searching for files with video ID - IMPROVED
+   * Find downloaded file by searching for files with video ID - ENHANCED
    */
   async findDownloadedFile(videoId, platform, timestamp) {
     try {
       const files = fs.readdirSync(this.outputDir);
       
-      // Look for files with the exact pattern first
-      const exactMatches = files.filter(file => {
+      // Strategy 1: Look for files with exact timestamp pattern
+      const timestampMatches = files.filter(file => {
         const lowerFile = file.toLowerCase();
         return lowerFile.includes(videoId.toLowerCase()) && 
                lowerFile.includes(timestamp.toString()) &&
@@ -190,16 +205,19 @@ class MultiPlatformDownloader {
                 lowerFile.endsWith('.mkv'));
       });
       
-      if (exactMatches.length > 0) {
-        return path.join(this.outputDir, exactMatches[0]);
+      if (timestampMatches.length > 0) {
+        console.log(chalk.green(`✅ Found file with timestamp: ${timestampMatches[0]}`));
+        return path.join(this.outputDir, timestampMatches[0]);
       }
       
-      // Look for files containing the video ID
+      // Strategy 2: Look for files with video ID (any timestamp)
       const videoIdMatches = files.filter(file => {
         const lowerFile = file.toLowerCase();
         const lowerVideoId = videoId.toLowerCase();
+        const lowerPlatform = platform.toLowerCase();
         
         return lowerFile.includes(lowerVideoId) &&
+               lowerFile.includes(lowerPlatform) &&
                (lowerFile.endsWith('.mp4') || 
                 lowerFile.endsWith('.webm') || 
                 lowerFile.endsWith('.mkv'));
@@ -213,15 +231,16 @@ class MultiPlatformDownloader {
           stats: fs.statSync(path.join(this.outputDir, file))
         })).sort((a, b) => b.stats.mtime - a.stats.mtime);
         
+        console.log(chalk.blue(`🔍 Found video ID match: ${sortedFiles[0].name}`));
         return sortedFiles[0].path;
       }
       
-      // Look for files with platform prefix
+      // Strategy 3: Look for files with platform prefix (most recent)
       const platformMatches = files.filter(file => {
         const lowerFile = file.toLowerCase();
         const lowerPlatform = platform.toLowerCase();
         
-        return lowerFile.includes(lowerPlatform) &&
+        return lowerFile.startsWith(lowerPlatform) &&
                (lowerFile.endsWith('.mp4') || 
                 lowerFile.endsWith('.webm') || 
                 lowerFile.endsWith('.mkv'));
@@ -239,7 +258,7 @@ class MultiPlatformDownloader {
         return sortedFiles[0].path;
       }
       
-      // If no matching files, return the most recent video file
+      // Strategy 4: If no matching files, return the most recent video file
       const videoFiles = files.filter(file => 
         file.endsWith('.mp4') || file.endsWith('.webm') || file.endsWith('.mkv')
       );
@@ -304,7 +323,7 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Get platform-specific download options - FIXED: No duplicates
+   * Get platform-specific download options
    */
   getDownloadOptions(platform, userOptions = {}) {
     // Base options that apply to all platforms

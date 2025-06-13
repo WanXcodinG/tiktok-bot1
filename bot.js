@@ -213,17 +213,45 @@ async function runInteractiveBot() {
   try {
     const rawPath = video.localPath;
     
-    // Verify the raw file exists
+    // Verify the raw file exists - ENHANCED VERIFICATION
     const fs = require('fs');
     if (!fs.existsSync(rawPath)) {
-      throw new Error(`❌ Input video file does not exist: ${rawPath}`);
+      console.error(chalk.red(`❌ Input video file does not exist: ${rawPath}`));
+      
+      // Try to find the file with different patterns
+      console.log(chalk.yellow('🔍 Searching for video file with different patterns...'));
+      const path = require('path');
+      const videoDir = path.dirname(rawPath);
+      
+      if (fs.existsSync(videoDir)) {
+        const files = fs.readdirSync(videoDir);
+        console.log(chalk.gray(`📁 Files in directory: ${files.join(', ')}`));
+        
+        // Look for files containing the video ID
+        const matchingFiles = files.filter(file => {
+          const lowerFile = file.toLowerCase();
+          const lowerVideoId = videoId.toLowerCase();
+          return lowerFile.includes(lowerVideoId) && 
+                 (lowerFile.endsWith('.mp4') || lowerFile.endsWith('.webm') || lowerFile.endsWith('.mkv'));
+        });
+        
+        if (matchingFiles.length > 0) {
+          const foundFile = path.join(videoDir, matchingFiles[0]);
+          console.log(chalk.green(`✅ Found matching file: ${foundFile}`));
+          video.localPath = foundFile; // Update the path
+        } else {
+          throw new Error(`❌ No video file found for ID: ${videoId}`);
+        }
+      } else {
+        throw new Error(`❌ Video directory does not exist: ${videoDir}`);
+      }
     }
     
     const editedPath = `./videos/edited/${videoId}-edited.mp4`;
     const finalPath = `./videos/edited/${videoId}-final.mp4`;
 
     console.log(chalk.yellow("🎬 Editing video..."));
-    await editAnimeVideo(rawPath, editedPath);
+    await editAnimeVideo(video.localPath, editedPath);
 
     console.log(chalk.yellow("🎵 Adding smart audio detection..."));
     const musicCategory = category.toLowerCase().includes('anime') ? 'anime' : 

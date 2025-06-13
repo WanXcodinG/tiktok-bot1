@@ -4,6 +4,11 @@ const fs = require("fs");
 
 const cookiesPath = path.join(__dirname, "../config/cookies.json");
 
+// Helper function for waiting
+async function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
   const browser = await puppeteer.launch({
     headless: false,
@@ -107,16 +112,20 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
     console.log("📤 Video uploaded:", videoPath);
 
     // Wait for video to process
-    await page.waitForTimeout(5000);
+    console.log("⏳ Waiting for video to process...");
+    await wait(5000);
 
     // ✍️ Add the caption
     try {
+      console.log("✍️ Adding caption...");
+      
       // Try multiple selectors for the caption input
       const captionSelectors = [
         "div[contenteditable='true']",
         "div[data-text='true']",
         "textarea[placeholder*='caption']",
-        "div[role='textbox']"
+        "div[role='textbox']",
+        "[data-e2e='editor']"
       ];
 
       let captionInput = null;
@@ -124,7 +133,10 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
         try {
           await page.waitForSelector(selector, { timeout: 5000 });
           captionInput = await page.$(selector);
-          if (captionInput) break;
+          if (captionInput) {
+            console.log(`✅ Found caption input with selector: ${selector}`);
+            break;
+          }
         } catch (e) {
           continue;
         }
@@ -132,7 +144,7 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
 
       if (captionInput) {
         await captionInput.click();
-        await page.waitForTimeout(1000);
+        await wait(1000);
         
         // Clear any existing text
         await page.keyboard.down('Control');
@@ -148,46 +160,66 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
       console.warn("⚠️ Could not add caption:", err.message);
     }
 
-    await page.waitForTimeout(2000);
+    await wait(2000);
 
     // 🚀 Click Post button using multiple strategies
     try {
-      let postButton = null;
+      console.log("🚀 Looking for Post button...");
+      let posted = false;
       
-      // Strategy 1: Try XPath with evaluate (newer Puppeteer compatible)
+      // Strategy 1: Try data-e2e attribute
       try {
-        postButton = await page.evaluateHandle(() => {
-          const buttons = Array.from(document.querySelectorAll('button'));
-          return buttons.find(btn => 
-            btn.textContent.includes('Post') || 
-            btn.textContent.includes('Publish') ||
-            btn.getAttribute('data-e2e') === 'publish-button'
-          );
-        });
-        
-        if (postButton && postButton.asElement) {
-          await postButton.asElement().click();
-          console.log("🚀 Posted to TikTok! (Strategy 1)");
+        const publishButton = await page.$('button[data-e2e="publish-button"]');
+        if (publishButton) {
+          await publishButton.click();
+          console.log("🚀 Posted to TikTok! (Strategy 1: data-e2e)");
+          posted = true;
         }
       } catch (e) {
         console.log("Strategy 1 failed, trying strategy 2...");
-        
-        // Strategy 2: Try CSS selectors
-        const postSelectors = [
-          'button[data-e2e="publish-button"]',
-          'button:contains("Post")',
-          'div[role="button"]:contains("Post")',
-          'button[type="submit"]'
+      }
+      
+      // Strategy 2: Search by text content
+      if (!posted) {
+        try {
+          const postButton = await page.evaluateHandle(() => {
+            const buttons = Array.from(document.querySelectorAll('button'));
+            return buttons.find(btn => {
+              const text = btn.textContent.toLowerCase();
+              return text.includes('post') || text.includes('publish') || text.includes('share');
+            });
+          });
+          
+          if (postButton && postButton.asElement) {
+            await postButton.asElement().click();
+            console.log("🚀 Posted to TikTok! (Strategy 2: text search)");
+            posted = true;
+          }
+        } catch (e) {
+          console.log("Strategy 2 failed, trying strategy 3...");
+        }
+      }
+      
+      // Strategy 3: Try common button selectors
+      if (!posted) {
+        const buttonSelectors = [
+          'button[type="submit"]',
+          'div[role="button"]',
+          '.btn-post',
+          '.publish-btn'
         ];
         
-        for (const selector of postSelectors) {
+        for (const selector of buttonSelectors) {
           try {
             const element = await page.$(selector);
             if (element) {
-              await element.click();
-              console.log("🚀 Posted to TikTok! (Strategy 2)");
-              postButton = element;
-              break;
+              const text = await page.evaluate(el => el.textContent, element);
+              if (text && (text.toLowerCase().includes('post') || text.toLowerCase().includes('publish'))) {
+                await element.click();
+                console.log(`🚀 Posted to TikTok! (Strategy 3: ${selector})`);
+                posted = true;
+                break;
+              }
             }
           } catch (e) {
             continue;
@@ -195,28 +227,23 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
         }
       }
       
-      if (!postButton) {
-        // Strategy 3: Manual search and click
-        await page.evaluate(() => {
-          const buttons = document.querySelectorAll('button, div[role="button"]');
-          for (let button of buttons) {
-            if (button.textContent.toLowerCase().includes('post') || 
-                button.textContent.toLowerCase().includes('publish')) {
-              button.click();
-              return true;
-            }
-          }
-          return false;
-        });
-        console.log("🚀 Attempted to post using Strategy 3");
+      if (!posted) {
+        console.warn("⚠️ Could not find or click post button automatically");
+        console.log("📝 Video uploaded and caption added. Please click 'Post' manually.");
+        console.log("🔍 The browser will stay open for 30 seconds for manual posting...");
+        await wait(30000);
       }
       
     } catch (err) {
-      console.warn("⚠️ Could not find or click post button:", err.message);
+      console.warn("⚠️ Error with post button:", err.message);
       console.log("📝 Video uploaded but may need manual posting");
     }
 
-    await page.waitForTimeout(5000);
+    // Final wait before closing
+    console.log("⏳ Finalizing upload...");
+    await wait(5000);
+    
+    console.log("✅ TikTok upload process completed!");
     
   } catch (err) {
     console.error("❌ Error during TikTok upload:", err.message);

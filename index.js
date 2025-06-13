@@ -1,48 +1,13 @@
-const inquirer = require("inquirer");
 const chalk = require("chalk");
 
 async function main() {
-  console.log(chalk.blueBright("🤖 TikTok Multi-Platform Content Bot"));
-  console.log(chalk.gray("Choose how you want to run the bot:"));
-
-  const { mode } = await inquirer.prompt([
-    {
-      type: "list",
-      name: "mode",
-      message: "What do you want to do?",
-      choices: [
-        "🎬 Process videos now (Interactive)",
-        "🧹 Cleanup files only",
-        "❌ Exit"
-      ],
-    },
-  ]);
+  console.log(chalk.blueBright("🤖 TikTok All-in-One Bot"));
+  console.log(chalk.gray("All functions integrated in one script!"));
 
   try {
-    switch (mode) {
-      case "🎬 Process videos now (Interactive)":
-        console.log(chalk.cyan("Starting interactive video processing..."));
-        const bot = require("./bot");
-        await bot();
-        break;
-        
-      case "🧹 Cleanup files only":
-        console.log(chalk.cyan("Starting cleanup..."));
-        const VideoCleanup = require("./utils/videoCleanup");
-        const cleanup = new VideoCleanup();
-        await cleanup.performFullCleanup();
-        console.log(chalk.green("✅ Cleanup completed!"));
-        break;
-        
-      case "❌ Exit":
-        console.log(chalk.gray("👋 Goodbye!"));
-        process.exit(0);
-        break;
-        
-      default:
-        console.log(chalk.red("❌ Invalid option selected"));
-        process.exit(1);
-    }
+    // Import and run the all-in-one bot
+    const allInOneBot = require("./all.js");
+    await allInOneBot();
   } catch (err) {
     console.error(chalk.red(`❌ Error: ${err.message}`));
     process.exit(1);

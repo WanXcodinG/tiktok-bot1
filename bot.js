@@ -1,15 +1,11 @@
-// bot.js
+// bot.js - Interactive video processing module
 const inquirer = require("inquirer");
 const chalk = require("chalk");
 require("dotenv").config();
-const cron = require("node-cron");
-const cleanup = require("./utils/cleanupOldVideos");
 const VideoCleanup = require("./utils/videoCleanup");
 const { getMultiPlatformVideos, getVideosByCategory } = require("./fetch/getMultiPlatformVideos");
 
-cron.schedule("0 3 * * *", cleanup); // 🕒 runs daily at 3:00 AM
-
-async function main() {
+async function runInteractiveBot() {
   console.log(chalk.blueBright("📱 TikTok Multi-Platform Content Bot"));
   console.log(chalk.gray("Supports: YouTube, TikTok, Instagram, Facebook, Twitter"));
   console.log(chalk.magenta("🎲 Now with Random Search & Smart Audio Detection!"));
@@ -272,5 +268,4 @@ async function main() {
   }
 }
 
-// main();
-module.exports = main;
+module.exports = runInteractiveBot;

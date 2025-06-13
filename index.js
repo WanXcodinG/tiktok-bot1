@@ -1,14 +1,67 @@
-const bot = require("./bot");
-const scheduler = require("./scheduler");
+const inquirer = require("inquirer");
+const chalk = require("chalk");
 
-// Start the bot to ask the user for their content choice
-bot()
-  .then(() => {
-    console.log("✅ User interaction completed.");
+async function main() {
+  console.log(chalk.blueBright("🤖 TikTok Multi-Platform Content Bot"));
+  console.log(chalk.gray("Choose how you want to run the bot:"));
 
-    // After user interaction, start the scheduler for automated posts
-    scheduler();
-  })
-  .catch((err) => {
-    console.error("❌ Error in bot interaction:", err.message);
+  const { mode } = await inquirer.prompt([
+    {
+      type: "list",
+      name: "mode",
+      message: "What do you want to do?",
+      choices: [
+        "🎬 Process videos now (Interactive)",
+        "⏰ Setup scheduled posting",
+        "🧹 Cleanup files only",
+        "❌ Exit"
+      ],
+    },
+  ]);
+
+  try {
+    switch (mode) {
+      case "🎬 Process videos now (Interactive)":
+        console.log(chalk.cyan("Starting interactive video processing..."));
+        const bot = require("./bot");
+        await bot();
+        break;
+        
+      case "⏰ Setup scheduled posting":
+        console.log(chalk.cyan("Starting scheduler setup..."));
+        const scheduler = require("./scheduler");
+        await scheduler();
+        break;
+        
+      case "🧹 Cleanup files only":
+        console.log(chalk.cyan("Starting cleanup..."));
+        const VideoCleanup = require("./utils/videoCleanup");
+        const cleanup = new VideoCleanup();
+        await cleanup.performFullCleanup();
+        console.log(chalk.green("✅ Cleanup completed!"));
+        break;
+        
+      case "❌ Exit":
+        console.log(chalk.gray("👋 Goodbye!"));
+        process.exit(0);
+        break;
+        
+      default:
+        console.log(chalk.red("❌ Invalid option selected"));
+        process.exit(1);
+    }
+  } catch (err) {
+    console.error(chalk.red(`❌ Error: ${err.message}`));
+    process.exit(1);
+  }
+}
+
+// Only run if this file is executed directly
+if (require.main === module) {
+  main().catch(err => {
+    console.error(chalk.red(`❌ Fatal error: ${err.message}`));
+    process.exit(1);
   });
+}
+
+module.exports = main;

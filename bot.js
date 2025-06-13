@@ -1,4 +1,3 @@
-// bot.js - Interactive video processing module
 const inquirer = require("inquirer");
 const chalk = require("chalk");
 require("dotenv").config();
@@ -42,10 +41,12 @@ async function runInteractiveBot() {
         name: "videoCategory",
         message: "What category best describes these videos?",
         choices: [
-          "Anime Edited Videos",
-          "Tech Shorts",
-          "Horror Clips", 
-          "Made-Up TikTok Movies",
+          "Entertainment",
+          "Tech/Gaming",
+          "Comedy/Funny", 
+          "Educational",
+          "Music/Dance",
+          "Sports/Fitness",
           "General/Other"
         ],
       },
@@ -66,10 +67,12 @@ async function runInteractiveBot() {
 
       // Set hashtags based on category
       const categoryHashtags = {
-        "Anime Edited Videos": "anime edit, fight scenes, Japanese animation",
-        "Tech Shorts": "tech, ai, gadgets, programming", 
-        "Horror Clips": "horror, scary, thriller, creepy",
-        "Made-Up TikTok Movies": "shortfilm, storytime, acting, movie",
+        "Entertainment": "entertainment, fun, viral, fyp",
+        "Tech/Gaming": "tech, gaming, review, fyp", 
+        "Comedy/Funny": "funny, comedy, viral, fyp",
+        "Educational": "educational, learn, tips, fyp",
+        "Music/Dance": "music, dance, trending, fyp",
+        "Sports/Fitness": "sports, fitness, workout, fyp",
         "General/Other": "viral, fyp, trending, content"
       };
       
@@ -105,10 +108,12 @@ async function runInteractiveBot() {
         name: "videoCategory",
         message: "What category best describes this search?",
         choices: [
-          "Anime Edited Videos",
-          "Tech Shorts",
-          "Horror Clips",
-          "Made-Up TikTok Movies", 
+          "Entertainment",
+          "Tech/Gaming",
+          "Comedy/Funny", 
+          "Educational",
+          "Music/Dance",
+          "Sports/Fitness",
           "General/Other"
         ],
       },
@@ -132,10 +137,12 @@ async function runInteractiveBot() {
 
       // Set hashtags based on category
       const categoryHashtags = {
-        "Anime Edited Videos": "anime edit, fight scenes, Japanese animation",
-        "Tech Shorts": "tech, ai, gadgets, programming",
-        "Horror Clips": "horror, scary, thriller, creepy", 
-        "Made-Up TikTok Movies": "shortfilm, storytime, acting, movie",
+        "Entertainment": "entertainment, fun, viral, fyp",
+        "Tech/Gaming": "tech, gaming, review, fyp",
+        "Comedy/Funny": "funny, comedy, viral, fyp", 
+        "Educational": "educational, learn, tips, fyp",
+        "Music/Dance": "music, dance, trending, fyp",
+        "Sports/Fitness": "sports, fitness, workout, fyp",
         "General/Other": "viral, fyp, trending, content"
       };
       
@@ -228,13 +235,8 @@ async function runInteractiveBot() {
     console.log(chalk.yellow("🎬 Editing video..."));
     await editAnimeVideo(video.localPath, editedPath);
 
-    console.log(chalk.yellow("🎵 Adding smart audio detection..."));
-    const musicCategory = category.toLowerCase().includes('anime') ? 'anime' : 
-                         category.toLowerCase().includes('tech') ? 'tech' :
-                         category.toLowerCase().includes('horror') ? 'horror' : 'anime';
-    
-    // Pass video info for better audio detection
-    await addMusicToVideo(editedPath, finalPath, musicCategory, {
+    console.log(chalk.yellow("🎵 Processing video with original audio..."));
+    await addMusicToVideo(editedPath, finalPath, category, {
       title: video.title,
       description: video.description || '',
       platform: video.platform,
@@ -269,7 +271,6 @@ async function runInteractiveBot() {
       console.log(chalk.cyan(`📊 Storage Usage:`));
       console.log(chalk.gray(`   Raw videos: ${finalStats.raw.count} files (${finalStats.raw.sizeMB}MB)`));
       console.log(chalk.gray(`   Edited videos: ${finalStats.edited.count} files (${finalStats.edited.sizeMB}MB)`));
-      console.log(chalk.gray(`   Music files: ${finalStats.music.count} files (${finalStats.music.sizeMB}MB)`));
       console.log(chalk.gray(`   Total: ${finalStats.total.count} files (${finalStats.total.sizeMB}MB)`));
     }
   }

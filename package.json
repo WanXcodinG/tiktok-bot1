@@ -11,7 +11,7 @@
   "keywords": [],
   "author": "Cyber_Jay",
   "license": "ISC",
-  "description": "A simplified Node.js automation bot that fetches, edits, and uploads video content to TikTok from multiple platforms including YouTube, TikTok, Instagram, Facebook, and Twitter.",
+  "description": "A simplified Node.js automation bot that fetches, edits, and uploads video content to TikTok from multiple platforms. Uses original video audio.",
   "dependencies": {
     "@distube/ytdl-core": "^4.16.8",
     "@google/generative-ai": "^0.21.0",

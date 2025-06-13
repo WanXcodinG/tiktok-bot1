@@ -5,7 +5,7 @@
 [![Made With](https://img.shields.io/badge/Made%20With-JavaScript-yellow)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![TikTok Automation](https://img.shields.io/badge/Automation-TikTok-blueviolet)](#)
 
-> ⚡ Automatically fetch, edit, caption, and upload content to TikTok from **multiple platforms** including YouTube, TikTok, Instagram, Facebook, and Twitter using **yt-dlp**. Supports **AI-generated captions** and **smart video processing**.
+> ⚡ Simple and clean bot to fetch, edit, and upload content to TikTok from **multiple platforms** including YouTube, TikTok, Instagram, Facebook, and Twitter using **yt-dlp**. Supports **AI-generated captions** and keeps **original video audio**.
 
 ---
 
@@ -26,7 +26,7 @@
 - 🌐 **Multi-platform support** - Download from YouTube, TikTok, Instagram, Facebook, Twitter
 - 🔗 **Flexible input** - URLs or search queries
 - 🧠 **AI-generated captions** using Google Gemini with trendy hashtags
-- 🎶 **Smart music integration** based on video category
+- 🎵 **Original audio preserved** - No background music overlay
 - 🤖 **Automated TikTok uploads** with Puppeteer
 - 🧹 **Auto-cleanup** of old video files
 - 🎬 **Professional video editing** with FFmpeg
@@ -87,9 +87,9 @@ https://twitter.com/user/status/TWEET_ID
 ### **🔍 Search by Keywords**
 Search any platform with custom keywords:
 ```
-"anime fight scenes"
-"AI technology 2024"
-"horror short films"
+"funny cat videos"
+"tech review 2024"
+"cooking tutorial"
 ```
 
 ---
@@ -103,19 +103,16 @@ tiktok-bot/
 │   └── getMultiPlatformVideos.js   # Main fetching logic
 ├── 📁 edit/                     # Video processing
 │   ├── animeEditor.js              # FFmpeg video editor
-│   └── addMusic.js                 # Music overlay system
+│   └── addMusic.js                 # Audio processing
 ├── 📁 upload/                   # TikTok automation
 │   └── tiktokUploader.js           # Puppeteer uploader
 ├── 📁 utils/                    # Utilities
 │   ├── generateCaption.js          # Gemini AI captions
 │   ├── platformUtils.js            # Platform detection
-│   ├── fetchMusic.js               # Music fetching
 │   └── videoCleanup.js             # File cleanup
 ├── 📁 videos/                   # Video storage
 │   ├── raw/                        # Downloaded videos
 │   └── edited/                     # Processed videos
-├── 📁 assets/                   # Music files
-│   └── music/                      # Background music
 ├── bot.js                       # Interactive CLI
 └── index.js                     # Main entry point
 ```
@@ -127,7 +124,7 @@ tiktok-bot/
 Powered by **Google Gemini AI** for intelligent, context-aware captions:
 
 ### **Smart Features:**
-- 🎯 **Context-aware** based on video content and platform
+- 🎯 **Context-aware** based on video content and category
 - 📈 **Trending hashtags** automatically included
 - 😊 **Emoji optimization** for better engagement
 - 📏 **Character limits** optimized for TikTok
@@ -135,10 +132,10 @@ Powered by **Google Gemini AI** for intelligent, context-aware captions:
 
 ### **Example Captions:**
 ```
-🔥 This anime fight scene hits different #anime #edit #fyp #viral
-🤖 AI technology that will blow your mind #tech #ai #future #fyp  
-😱 Why did I watch this at 3AM? #horror #scary #creepy #fyp
-📱 Made entirely on phone! Plot twist 🎬 #shortfilm #creative #fyp
+🔥 This hits different! #entertainment #viral #fyp #trending
+🤖 Tech that will blow your mind #tech #gaming #review #fyp  
+😂 Can't stop laughing at this #funny #comedy #viral #fyp
+📚 Learn something new today #educational #learn #tips #fyp
 ```
 
 ---
@@ -177,7 +174,7 @@ const options = {
 ? What do you want to do? 🎬 Process videos now (Interactive)
 ? How do you want to get videos? 🔗 Provide direct URLs
 ? Enter video URLs: https://youtube.com/watch?v=abc123
-? What category best describes these videos? Tech Shorts
+? What category best describes these videos? Tech/Gaming
 
 🌐 Multi-Platform Video Fetcher Started
 ✅ Detected 📺 YouTube: https://youtube.com/watch?v=abc123
@@ -187,10 +184,10 @@ const options = {
 🎬 Processing: Epic Tech Review 2024
 📱 Platform: YouTube
 🎬 Editing video...
-🎵 Adding music...
+🎵 Processing video with original audio...
 📝 Generating caption...
 🤖 Calling Gemini API...
-✅ Gemini Generated Caption: 🤖 This tech will change everything! #tech #ai #future #fyp
+✅ Gemini Generated Caption: 🤖 This tech will change everything! #tech #gaming #review #fyp
 📤 Uploading to TikTok...
 🚀 Video posted successfully!
 ```

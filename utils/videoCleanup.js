@@ -10,7 +10,6 @@ class VideoCleanup {
   constructor() {
     this.rawDir = path.join(__dirname, '../videos/raw');
     this.editedDir = path.join(__dirname, '../videos/edited');
-    this.musicDir = path.join(__dirname, '../assets/music');
     
     // Track protected files (recently downloaded)
     this.protectedFiles = new Set();
@@ -18,7 +17,6 @@ class VideoCleanup {
     // Ensure directories exist
     fs.ensureDirSync(this.rawDir);
     fs.ensureDirSync(this.editedDir);
-    fs.ensureDirSync(this.musicDir);
   }
 
   /**
@@ -317,58 +315,6 @@ class VideoCleanup {
   }
 
   /**
-   * Clean unused music files
-   */
-  async cleanupUnusedMusic(maxMusicFiles = 10) {
-    try {
-      console.log(chalk.cyan(`🎵 Managing music files (max: ${maxMusicFiles})...`));
-      
-      if (!fs.existsSync(this.musicDir)) {
-        return;
-      }
-      
-      const musicFiles = fs.readdirSync(this.musicDir)
-        .filter(file => (file.endsWith('.mp3') || file.endsWith('.wav')) && !file.endsWith('.part'))
-        .map(file => {
-          const filePath = path.join(this.musicDir, file);
-          const stats = fs.statSync(filePath);
-          return {
-            name: file,
-            path: filePath,
-            mtime: stats.mtime,
-            size: stats.size
-          };
-        })
-        .sort((a, b) => b.mtime - a.mtime); // Sort by newest first
-      
-      // Remove excess music files (keep only the newest ones)
-      if (musicFiles.length > maxMusicFiles) {
-        const filesToRemove = musicFiles.slice(maxMusicFiles);
-        
-        for (const file of filesToRemove) {
-          try {
-            // Skip protected files
-            if (!this.isFileProtected(file.path)) {
-              await fs.remove(file.path);
-              console.log(chalk.gray(`🗑️ Removed old music: ${file.name}`));
-            }
-          } catch (err) {
-            console.error(chalk.red(`❌ Failed to remove music ${file.path}: ${err.message}`));
-          }
-        }
-        
-        console.log(chalk.green(`✅ Removed ${filesToRemove.length} old music file(s)`));
-      }
-      
-      // Remove duplicates in music directory
-      await this.removeDuplicates(this.musicDir);
-      
-    } catch (err) {
-      console.error(chalk.red(`❌ Error cleaning music files: ${err.message}`));
-    }
-  }
-
-  /**
    * Get storage usage statistics
    */
   async getStorageStats() {
@@ -376,14 +322,12 @@ class VideoCleanup {
       const stats = {
         raw: { count: 0, size: 0 },
         edited: { count: 0, size: 0 },
-        music: { count: 0, size: 0 },
         total: { count: 0, size: 0 }
       };
       
       const directories = [
         { key: 'raw', path: this.rawDir },
-        { key: 'edited', path: this.editedDir },
-        { key: 'music', path: this.musicDir }
+        { key: 'edited', path: this.editedDir }
       ];
       
       for (const { key, path: dirPath } of directories) {
@@ -434,13 +378,9 @@ class VideoCleanup {
       // Remove duplicates (respecting protections)
       await this.removeDuplicates(this.rawDir);
       await this.removeDuplicates(this.editedDir);
-      await this.removeDuplicates(this.musicDir);
       
       // Clean old files (older than 24 hours, respecting protections)
       await this.cleanupOldFiles(24);
-      
-      // Manage music files
-      await this.cleanupUnusedMusic(8);
       
       // Get final stats
       const finalStats = await this.getStorageStats();

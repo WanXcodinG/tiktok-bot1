@@ -1,11 +1,10 @@
 const ffmpeg = require("fluent-ffmpeg");
 const chalk = require("chalk");
-const path = require("path");
 const fs = require("fs");
 
-async function addMusicToVideo(videoPath, outputPath, category = "general", videoInfo = {}) {
+async function processVideoAudio(videoPath, outputPath) {
   try {
-    console.log(chalk.cyan(`🎵 Processing video audio...`));
+    console.log(chalk.cyan(`🎵 Processing video with original audio...`));
     
     // Check if video file exists
     if (!fs.existsSync(videoPath)) {
@@ -17,12 +16,10 @@ async function addMusicToVideo(videoPath, outputPath, category = "general", vide
     return new Promise((resolve, reject) => {
       // Simply copy the video with original audio, ensuring proper encoding
       ffmpeg(videoPath)
-        .videoCodec('libx264')
+        .videoCodec('copy')
         .audioCodec('aac')
         .audioBitrate('128k')
         .outputOptions([
-          '-preset', 'fast',
-          '-crf', '23',
           '-movflags', '+faststart'
         ])
         .on('start', (commandLine) => {
@@ -45,9 +42,9 @@ async function addMusicToVideo(videoPath, outputPath, category = "general", vide
     });
     
   } catch (err) {
-    console.error(chalk.red(`❌ Error in addMusicToVideo: ${err.message}`));
+    console.error(chalk.red(`❌ Error in processVideoAudio: ${err.message}`));
     throw err;
   }
 }
 
-module.exports = addMusicToVideo;
+module.exports = processVideoAudio;

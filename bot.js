@@ -7,7 +7,6 @@ const { getMultiPlatformVideos } = require("./fetch/getMultiPlatformVideos");
 async function runInteractiveBot() {
   console.log(chalk.blueBright("📱 TikTok Multi-Platform Content Bot"));
   console.log(chalk.gray("Supports: YouTube, TikTok, Instagram, Facebook, Twitter"));
-  console.log(chalk.green("🧹 Auto-cleanup & Duplicate Management Enabled!"));
 
   const { inputType } = await inquirer.prompt([
     {
@@ -22,7 +21,6 @@ async function runInteractiveBot() {
   ]);
 
   let results = [];
-  let category = "";
   let hashtags = "";
 
   if (inputType === "🔗 Provide direct URLs") {
@@ -35,48 +33,18 @@ async function runInteractiveBot() {
       },
     ]);
 
-    const { videoCategory } = await inquirer.prompt([
-      {
-        type: "list",
-        name: "videoCategory",
-        message: "What category best describes these videos?",
-        choices: [
-          "Entertainment",
-          "Tech/Gaming",
-          "Comedy/Funny", 
-          "Educational",
-          "Music/Dance",
-          "Sports/Fitness",
-          "General/Other"
-        ],
-      },
-    ]);
-
     const urlList = urls.split(',').map(url => url.trim()).filter(url => url);
-    category = videoCategory;
     
     try {
       results = await getMultiPlatformVideos(urlList, { quality: 1080 });
       
-      // Add category info
+      // Add video ID
       results = results.map(result => ({
         ...result,
-        category: category,
         videoId: result.actualVideoId || result.id || result.videoId
       }));
 
-      // Set hashtags based on category
-      const categoryHashtags = {
-        "Entertainment": "entertainment, fun, viral, fyp",
-        "Tech/Gaming": "tech, gaming, review, fyp", 
-        "Comedy/Funny": "funny, comedy, viral, fyp",
-        "Educational": "educational, learn, tips, fyp",
-        "Music/Dance": "music, dance, trending, fyp",
-        "Sports/Fitness": "sports, fitness, workout, fyp",
-        "General/Other": "viral, fyp, trending, content"
-      };
-      
-      hashtags = categoryHashtags[category] || "viral, fyp, trending";
+      hashtags = "viral, fyp, trending, content";
       
     } catch (err) {
       console.error(chalk.red(`❌ Failed to download videos: ${err.message}`));
@@ -93,60 +61,20 @@ async function runInteractiveBot() {
       },
     ]);
 
-    const { platform } = await inquirer.prompt([
-      {
-        type: "list",
-        name: "platform",
-        message: "Which platform to search?",
-        choices: ["YouTube", "All Platforms"],
-      },
-    ]);
-
-    const { videoCategory } = await inquirer.prompt([
-      {
-        type: "list", 
-        name: "videoCategory",
-        message: "What category best describes this search?",
-        choices: [
-          "Entertainment",
-          "Tech/Gaming",
-          "Comedy/Funny", 
-          "Educational",
-          "Music/Dance",
-          "Sports/Fitness",
-          "General/Other"
-        ],
-      },
-    ]);
-
-    category = videoCategory;
-    
     try {
       results = await getMultiPlatformVideos(searchQuery, {
-        platform: platform === "All Platforms" ? "YouTube" : platform,
+        platform: "YouTube",
         limit: 1,
         quality: 1080
       });
 
-      // Add category info
+      // Add video ID
       results = results.map(result => ({
         ...result,
-        category: category,
         videoId: result.actualVideoId || result.id || result.videoId
       }));
 
-      // Set hashtags based on category
-      const categoryHashtags = {
-        "Entertainment": "entertainment, fun, viral, fyp",
-        "Tech/Gaming": "tech, gaming, review, fyp",
-        "Comedy/Funny": "funny, comedy, viral, fyp", 
-        "Educational": "educational, learn, tips, fyp",
-        "Music/Dance": "music, dance, trending, fyp",
-        "Sports/Fitness": "sports, fitness, workout, fyp",
-        "General/Other": "viral, fyp, trending, content"
-      };
-      
-      hashtags = categoryHashtags[category] || "viral, fyp, trending";
+      hashtags = "viral, fyp, trending, content";
       
     } catch (err) {
       console.error(chalk.red(`❌ Failed to search and download: ${err.message}`));
@@ -181,8 +109,8 @@ async function runInteractiveBot() {
 
   // Import processing modules
   const generateCaption = require("./utils/generateCaption");
-  const editAnimeVideo = require("./edit/animeEditor");
-  const addMusicToVideo = require("./edit/addMusic");
+  const editVideo = require("./edit/videoEditor");
+  const processVideoAudio = require("./edit/addMusic");
   const uploadToTikTok = require("./upload/tiktokUploader");
 
   let uploadSuccess = false;
@@ -190,7 +118,7 @@ async function runInteractiveBot() {
   try {
     const rawPath = video.localPath;
     
-    // Verify the raw file exists - ENHANCED VERIFICATION
+    // Verify the raw file exists
     const fs = require('fs');
     if (!fs.existsSync(rawPath)) {
       console.error(chalk.red(`❌ Input video file does not exist: ${rawPath}`));
@@ -233,15 +161,10 @@ async function runInteractiveBot() {
     const finalPath = `./videos/edited/${videoId}-final.mp4`;
 
     console.log(chalk.yellow("🎬 Editing video..."));
-    await editAnimeVideo(video.localPath, editedPath);
+    await editVideo(video.localPath, editedPath);
 
-    console.log(chalk.yellow("🎵 Processing video with original audio..."));
-    await addMusicToVideo(editedPath, finalPath, category, {
-      title: video.title,
-      description: video.description || '',
-      platform: video.platform,
-      category: category
-    });
+    console.log(chalk.yellow("🎵 Processing video audio..."));
+    await processVideoAudio(editedPath, finalPath);
 
     console.log(chalk.yellow("📝 Generating caption..."));
     const caption = await generateCaption(hashtags);
@@ -254,7 +177,6 @@ async function runInteractiveBot() {
     console.log(chalk.cyan(`📊 Summary:`));
     console.log(chalk.gray(`   Title: ${video.title}`));
     console.log(chalk.gray(`   Platform: ${video.platform}`));
-    console.log(chalk.gray(`   Category: ${category}`));
     console.log(chalk.gray(`   Caption: ${caption}`));
 
   } catch (err) {

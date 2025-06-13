@@ -4,7 +4,7 @@ const chalk = require('chalk');
 const crypto = require('crypto');
 
 /**
- * Video cleanup and duplicate management utility
+ * Video cleanup and duplicate management utility - IMPROVED
  */
 class VideoCleanup {
   constructor() {
@@ -49,6 +49,67 @@ class VideoCleanup {
       return this.protectedFiles.has(absolutePath);
     } catch (err) {
       return false;
+    }
+  }
+
+  /**
+   * Clean old files that are NOT the current video being processed
+   */
+  async cleanupOldFilesExceptCurrent(currentVideoId, maxAgeMinutes = 30) {
+    try {
+      console.log(chalk.cyan(`🕒 Cleaning old files (except current video: ${currentVideoId})...`));
+      
+      const now = Date.now();
+      const maxAge = maxAgeMinutes * 60 * 1000; // Convert to milliseconds
+      
+      const directories = [this.rawDir, this.editedDir];
+      let totalRemoved = 0;
+      
+      for (const dir of directories) {
+        if (!fs.existsSync(dir)) continue;
+        
+        const files = fs.readdirSync(dir).filter(file => 
+          !file.endsWith('.part') // Skip partial downloads
+        );
+        
+        for (const file of files) {
+          const filePath = path.join(dir, file);
+          
+          // Skip if this is the current video being processed
+          if (file.includes(currentVideoId)) {
+            console.log(chalk.blue(`🛡️ Skipping current video: ${file}`));
+            continue;
+          }
+          
+          // Skip protected files
+          if (this.isFileProtected(filePath)) {
+            console.log(chalk.blue(`🛡️ Skipping protected file: ${file}`));
+            continue;
+          }
+          
+          const stats = fs.statSync(filePath);
+          const fileAge = now - stats.mtime.getTime();
+          
+          if (fileAge > maxAge) {
+            try {
+              await fs.remove(filePath);
+              console.log(chalk.gray(`🗑️ Removed old file: ${file} (${Math.round(fileAge / (60 * 1000))}min old)`));
+              totalRemoved++;
+            } catch (err) {
+              console.error(chalk.red(`❌ Failed to remove old file ${filePath}: ${err.message}`));
+            }
+          }
+        }
+      }
+      
+      if (totalRemoved > 0) {
+        console.log(chalk.green(`✅ Removed ${totalRemoved} old file(s)`));
+      } else {
+        console.log(chalk.gray(`✅ No old files to remove`));
+      }
+      
+    } catch (err) {
+      console.error(chalk.red(`❌ Error cleaning old files: ${err.message}`));
     }
   }
 

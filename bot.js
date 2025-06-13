@@ -118,9 +118,9 @@ async function runInteractiveBot() {
     videoCleanup.protectFile(video.localPath, 60); // Protect for 60 minutes
   }
 
-  // Perform initial cleanup AFTER protecting the file
-  console.log(chalk.cyan("🧹 Performing initial cleanup..."));
-  await videoCleanup.performFullCleanup();
+  // Perform cleanup of OLD files only (not the current video)
+  console.log(chalk.cyan("🧹 Performing cleanup of old files..."));
+  await videoCleanup.cleanupOldFilesExceptCurrent(videoId, 30); // Clean files older than 30 minutes except current
 
   // Import processing modules
   const generateCaption = require("./utils/generateCaption");

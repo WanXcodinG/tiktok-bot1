@@ -4,6 +4,7 @@ const chalk = require("chalk");
 require("dotenv").config();
 const cron = require("node-cron");
 const cleanup = require("./utils/cleanupOldVideos");
+const VideoCleanup = require("./utils/videoCleanup");
 const { getMultiPlatformVideos, getVideosByCategory } = require("./fetch/getMultiPlatformVideos");
 
 cron.schedule("0 3 * * *", cleanup); // 🕒 runs daily at 3:00 AM
@@ -12,6 +13,7 @@ async function main() {
   console.log(chalk.blueBright("📱 TikTok Multi-Platform Content Bot"));
   console.log(chalk.gray("Supports: YouTube, TikTok, Instagram, Facebook, Twitter"));
   console.log(chalk.magenta("🎲 Now with Random Search & Smart Audio Detection!"));
+  console.log(chalk.green("🧹 Auto-cleanup & Duplicate Management Enabled!"));
 
   const { inputType } = await inquirer.prompt([
     {
@@ -185,11 +187,20 @@ async function main() {
     return;
   }
 
+  // Initialize cleanup utility
+  const videoCleanup = new VideoCleanup();
+  
+  // Perform initial cleanup to remove duplicates and old files
+  console.log(chalk.cyan("🧹 Performing initial cleanup..."));
+  await videoCleanup.performFullCleanup();
+
   // Process the first video
   const video = results[0];
+  const videoId = video.videoId || video.id;
   console.log(chalk.cyan(`🎬 Processing: ${video.title}`));
   console.log(chalk.gray(`📱 Platform: ${video.platform}`));
   console.log(chalk.gray(`📁 File: ${video.localPath}`));
+  console.log(chalk.gray(`🆔 Video ID: ${videoId}`));
   
   if (video.searchTerm) {
     console.log(chalk.magenta(`🎲 Random search used: "${video.searchTerm}"`));
@@ -201,10 +212,12 @@ async function main() {
   const addMusicToVideo = require("./edit/addMusic");
   const uploadToTikTok = require("./upload/tiktokUploader");
 
+  let uploadSuccess = false;
+
   try {
     const rawPath = video.localPath;
-    const editedPath = `./videos/edited/${video.videoId}-edited.mp4`;
-    const finalPath = `./videos/edited/${video.videoId}-final.mp4`;
+    const editedPath = `./videos/edited/${videoId}-edited.mp4`;
+    const finalPath = `./videos/edited/${videoId}-final.mp4`;
 
     console.log(chalk.yellow("🎬 Editing video..."));
     await editAnimeVideo(rawPath, editedPath);
@@ -228,6 +241,7 @@ async function main() {
     console.log(chalk.yellow("📤 Uploading to TikTok..."));
     await uploadToTikTok(finalPath, caption);
 
+    uploadSuccess = true;
     console.log(chalk.green("🚀 Video posted successfully!"));
     console.log(chalk.cyan(`📊 Summary:`));
     console.log(chalk.gray(`   Title: ${video.title}`));
@@ -239,7 +253,22 @@ async function main() {
     console.log(chalk.gray(`   Caption: ${caption}`));
 
   } catch (err) {
+    uploadSuccess = false;
     console.error(chalk.red(`❌ Error processing video: ${err.message}`));
+  } finally {
+    // Always perform cleanup after processing
+    console.log(chalk.cyan("🧹 Performing post-processing cleanup..."));
+    await videoCleanup.cleanupAfterUpload(videoId, uploadSuccess);
+    
+    // Show final storage stats
+    const finalStats = await videoCleanup.getStorageStats();
+    if (finalStats) {
+      console.log(chalk.cyan(`📊 Storage Usage:`));
+      console.log(chalk.gray(`   Raw videos: ${finalStats.raw.count} files (${finalStats.raw.sizeMB}MB)`));
+      console.log(chalk.gray(`   Edited videos: ${finalStats.edited.count} files (${finalStats.edited.sizeMB}MB)`));
+      console.log(chalk.gray(`   Music files: ${finalStats.music.count} files (${finalStats.music.sizeMB}MB)`));
+      console.log(chalk.gray(`   Total: ${finalStats.total.count} files (${finalStats.total.sizeMB}MB)`));
+    }
   }
 }
 

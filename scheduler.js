@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const inquirer = require("inquirer");
 const chalk = require("chalk");
 const cleanup = require("./utils/cleanupOldVideos");
+const VideoCleanup = require("./utils/videoCleanup");
 
 const jobs = {
   "Anime Edited Videos": require("./schedulerJobs/animeJob"),
@@ -11,9 +12,18 @@ const jobs = {
 };
 
 async function startScheduler() {
-  // Clean old videos daily at 3:00 AM
+  // Enhanced cleanup schedule - runs every 6 hours
+  cron.schedule("0 */6 * * *", async () => {
+    console.log(chalk.cyan("🕒 Scheduled cleanup started..."));
+    const videoCleanup = new VideoCleanup();
+    await videoCleanup.performFullCleanup();
+  });
+  
+  // Daily deep cleanup at 3:00 AM
   cron.schedule("0 3 * * *", cleanup);
+  
   console.log(chalk.cyan("🕒 TikTok Bot Scheduler Setup"));
+  console.log(chalk.green("🧹 Enhanced cleanup schedules enabled!"));
 
   const { selectedCategories } = await inquirer.prompt([
     {
@@ -43,6 +53,7 @@ async function startScheduler() {
   }
 
   console.log(chalk.blueBright("📅 All schedules set! Bot will post automatically."));
+  console.log(chalk.gray("🧹 Cleanup runs every 6 hours + daily deep clean at 3:00 AM"));
 }
 
 module.exports = startScheduler;

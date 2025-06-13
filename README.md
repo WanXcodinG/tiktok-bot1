@@ -5,7 +5,7 @@
 [![Made With](https://img.shields.io/badge/Made%20With-JavaScript-yellow)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![TikTok Automation](https://img.shields.io/badge/Automation-TikTok-blueviolet)](#)
 
-> ⚡ Automatically fetch, edit, caption, and upload content to TikTok from **multiple platforms** including YouTube, TikTok, Instagram, Facebook, and Twitter using **yt-dlp**. Supports **AI-generated captions**, **scheduled posting**, and **smart video processing**.
+> ⚡ Automatically fetch, edit, caption, and upload content to TikTok from **multiple platforms** including YouTube, TikTok, Instagram, Facebook, and Twitter using **yt-dlp**. Supports **AI-generated captions** and **smart video processing**.
 
 ---
 
@@ -24,11 +24,10 @@
 ## ✨ Features
 
 - 🌐 **Multi-platform support** - Download from YouTube, TikTok, Instagram, Facebook, Twitter
-- 🔗 **Flexible input** - URLs, search queries, or category-based content
+- 🔗 **Flexible input** - URLs or search queries
 - 🧠 **AI-generated captions** using Google Gemini with trendy hashtags
 - 🎶 **Smart music integration** based on video category
 - 🤖 **Automated TikTok uploads** with Puppeteer
-- ⏱️ **Scheduled posting** with cron jobs
 - 🧹 **Auto-cleanup** of old video files
 - 🎬 **Professional video editing** with FFmpeg
 - 📊 **Platform-specific optimization**
@@ -75,15 +74,6 @@ npm start
 
 ## 🎯 Usage Options
 
-### **📂 Category-Based Content**
-Choose from pre-configured categories:
-- 🎌 **Anime Edited Videos** - AMVs and fight scenes
-- 🤖 **Tech Shorts** - AI, gadgets, programming
-- 👻 **Horror Clips** - Scary stories and thrillers  
-- 🎬 **Made-Up TikTok Movies** - Short films and stories
-- 🎵 **TikTok Viral** - Trending TikTok content
-- 📸 **Instagram Reels** - Viral Instagram content
-
 ### **🔗 Direct URLs**
 Paste any supported platform URL:
 ```
@@ -110,8 +100,7 @@ Search any platform with custom keywords:
 tiktok-bot/
 ├── 📁 fetch/                    # Multi-platform downloaders
 │   ├── multiPlatformDownloader.js  # Core yt-dlp wrapper
-│   ├── getMultiPlatformVideos.js   # Main fetching logic
-│   └── legacy fetchers...           # YouTube-only fetchers
+│   └── getMultiPlatformVideos.js   # Main fetching logic
 ├── 📁 edit/                     # Video processing
 │   ├── animeEditor.js              # FFmpeg video editor
 │   └── addMusic.js                 # Music overlay system
@@ -120,13 +109,14 @@ tiktok-bot/
 ├── 📁 utils/                    # Utilities
 │   ├── generateCaption.js          # Gemini AI captions
 │   ├── platformUtils.js            # Platform detection
-│   └── cleanupOldVideos.js         # File cleanup
-├── 📁 schedulerJobs/            # Automated posting
+│   ├── fetchMusic.js               # Music fetching
+│   └── videoCleanup.js             # File cleanup
 ├── 📁 videos/                   # Video storage
 │   ├── raw/                        # Downloaded videos
 │   └── edited/                     # Processed videos
+├── 📁 assets/                   # Music files
+│   └── music/                      # Background music
 ├── bot.js                       # Interactive CLI
-├── scheduler.js                 # Cron job manager
 └── index.js                     # Main entry point
 ```
 
@@ -179,44 +169,28 @@ const options = {
 
 ---
 
-## 📅 Scheduled Posting
-
-Set up automated posting with cron jobs:
-
-```bash
-node scheduler.js
-```
-
-**Schedule Options:**
-- ⏰ **Daily posting** at specific times
-- 📊 **Multiple categories** with different schedules  
-- 🔄 **Automatic content rotation**
-- 🧹 **Daily cleanup** at 3:00 AM
-
----
-
 ## 💡 Example Workflow
 
 ```
 📱 TikTok Multi-Platform Content Bot
-Supports: YouTube, TikTok, Instagram, Facebook, Twitter
 
+? What do you want to do? 🎬 Process videos now (Interactive)
 ? How do you want to get videos? 🔗 Provide direct URLs
 ? Enter video URLs: https://youtube.com/watch?v=abc123
-? What category best describes these videos? Anime Edited Videos
+? What category best describes these videos? Tech Shorts
 
 🌐 Multi-Platform Video Fetcher Started
 ✅ Detected 📺 YouTube: https://youtube.com/watch?v=abc123
 📥 Downloading from YouTube...
 ✅ Downloaded successfully! Size: 45.2MB
 
-🎬 Processing: Epic Anime Fight Compilation
+🎬 Processing: Epic Tech Review 2024
 📱 Platform: YouTube
 🎬 Editing video...
 🎵 Adding music...
 📝 Generating caption...
 🤖 Calling Gemini API...
-✅ Gemini Generated Caption: 🔥 Epic anime fight that hits different #anime #edit #fyp #viral
+✅ Gemini Generated Caption: 🤖 This tech will change everything! #tech #ai #future #fyp
 📤 Uploading to TikTok...
 🚀 Video posted successfully!
 ```

@@ -12,7 +12,6 @@ async function main() {
       message: "What do you want to do?",
       choices: [
         "🎬 Process videos now (Interactive)",
-        "⏰ Setup cleanup schedules",
         "🧹 Cleanup files only",
         "❌ Exit"
       ],
@@ -25,12 +24,6 @@ async function main() {
         console.log(chalk.cyan("Starting interactive video processing..."));
         const bot = require("./bot");
         await bot();
-        break;
-        
-      case "⏰ Setup cleanup schedules":
-        console.log(chalk.cyan("Starting cleanup scheduler setup..."));
-        const scheduler = require("./scheduler");
-        await scheduler();
         break;
         
       case "🧹 Cleanup files only":

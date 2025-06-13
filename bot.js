@@ -133,29 +133,57 @@ async function runInteractiveBot() {
   try {
     const rawPath = video.localPath;
     
-    // Verify the raw file exists
+    // Verify the raw file exists with enhanced checking
     const fs = require('fs');
     if (!fs.existsSync(rawPath)) {
       console.error(chalk.red(`❌ Input video file does not exist: ${rawPath}`));
       
-      // Try to find the file with different patterns
-      console.log(chalk.yellow('🔍 Searching for video file with different patterns...'));
+      // Enhanced file search
+      console.log(chalk.yellow('🔍 Searching for video file with enhanced detection...'));
       const path = require('path');
       const videoDir = path.dirname(rawPath);
       
       if (fs.existsSync(videoDir)) {
-        const files = fs.readdirSync(videoDir).filter(file => 
-          !file.endsWith('.part') && // Skip partial downloads
-          (file.endsWith('.mp4') || file.endsWith('.webm') || file.endsWith('.mkv'))
-        );
-        console.log(chalk.gray(`📁 Files in directory: ${files.join(', ')}`));
+        const files = fs.readdirSync(videoDir).filter(file => {
+          const lowerFile = file.toLowerCase();
+          return !lowerFile.endsWith('.part') && // Skip partial downloads
+                 !lowerFile.includes('.tmp') && // Skip temp files
+                 (lowerFile.endsWith('.mp4') || 
+                  lowerFile.endsWith('.webm') || 
+                  lowerFile.endsWith('.mkv') ||
+                  lowerFile.endsWith('.avi') ||
+                  lowerFile.endsWith('.mov'));
+        });
         
-        // Look for files containing the video ID
-        const matchingFiles = files.filter(file => {
+        console.log(chalk.gray(`📁 Available video files: ${files.join(', ')}`));
+        
+        // Strategy 1: Look for files containing the video ID
+        let matchingFiles = files.filter(file => {
           const lowerFile = file.toLowerCase();
           const lowerVideoId = videoId.toLowerCase();
           return lowerFile.includes(lowerVideoId);
         });
+        
+        // Strategy 2: Look for files with platform prefix
+        if (matchingFiles.length === 0) {
+          const platform = video.platform.toLowerCase();
+          matchingFiles = files.filter(file => {
+            const lowerFile = file.toLowerCase();
+            return lowerFile.startsWith(platform);
+          });
+        }
+        
+        // Strategy 3: Use the most recent file
+        if (matchingFiles.length === 0 && files.length > 0) {
+          console.log(chalk.yellow('⚠️ No specific matches found, using most recent file'));
+          const filesWithStats = files.map(file => {
+            const filePath = path.join(videoDir, file);
+            const stats = fs.statSync(filePath);
+            return { file, mtime: stats.mtime };
+          }).sort((a, b) => b.mtime - a.mtime);
+          
+          matchingFiles = [filesWithStats[0].file];
+        }
         
         if (matchingFiles.length > 0) {
           const foundFile = path.join(videoDir, matchingFiles[0]);

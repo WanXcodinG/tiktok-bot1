@@ -88,7 +88,7 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Download video from any supported platform - FIXED FILE DETECTION
+   * Download video from any supported platform - ENHANCED FILE DETECTION
    */
   async downloadVideo(url, options = {}) {
     try {
@@ -102,6 +102,10 @@ class MultiPlatformDownloader {
       // Get video info first (with fallback)
       const videoInfo = await this.getVideoInfo(url);
       const videoId = videoInfo.id;
+      
+      // Get list of files BEFORE download
+      const filesBefore = this.getVideoFiles();
+      console.log(chalk.gray(`📁 Files before download: ${filesBefore.length}`));
       
       // Create unique filename with timestamp to avoid conflicts
       const timestamp = Date.now();
@@ -133,8 +137,31 @@ class MultiPlatformDownloader {
         throw new Error(`Download failed: ${ytDlpError.message}`);
       }
       
-      // Find the downloaded file - IMPROVED DETECTION
-      const downloadedFile = await this.findDownloadedFile(videoId, platform, timestamp);
+      // Get list of files AFTER download and find the new file
+      const filesAfter = this.getVideoFiles();
+      console.log(chalk.gray(`📁 Files after download: ${filesAfter.length}`));
+      
+      // Find the newly downloaded file
+      const newFiles = filesAfter.filter(file => !filesBefore.includes(file));
+      
+      let downloadedFile = null;
+      
+      if (newFiles.length > 0) {
+        // Use the newest file from the new files
+        const newestFile = newFiles.reduce((newest, current) => {
+          const currentPath = path.join(this.outputDir, current);
+          const newestPath = path.join(this.outputDir, newest);
+          const currentStats = fs.statSync(currentPath);
+          const newestStats = fs.statSync(newestPath);
+          return currentStats.mtime > newestStats.mtime ? current : newest;
+        });
+        
+        downloadedFile = path.join(this.outputDir, newestFile);
+        console.log(chalk.green(`✅ Found new downloaded file: ${newestFile}`));
+      } else {
+        // Fallback: search for files with video ID or timestamp
+        downloadedFile = await this.findDownloadedFile(videoId, platform, timestamp);
+      }
       
       if (downloadedFile && fs.existsSync(downloadedFile)) {
         const stats = fs.statSync(downloadedFile);
@@ -197,21 +224,43 @@ class MultiPlatformDownloader {
   }
 
   /**
+   * Get all video files in the output directory
+   */
+  getVideoFiles() {
+    try {
+      if (!fs.existsSync(this.outputDir)) {
+        return [];
+      }
+      
+      return fs.readdirSync(this.outputDir).filter(file => {
+        const lowerFile = file.toLowerCase();
+        return (lowerFile.endsWith('.mp4') || 
+                lowerFile.endsWith('.webm') || 
+                lowerFile.endsWith('.mkv') ||
+                lowerFile.endsWith('.avi') ||
+                lowerFile.endsWith('.mov')) &&
+               !lowerFile.endsWith('.part') && // Skip partial downloads
+               !lowerFile.includes('.tmp'); // Skip temp files
+      });
+    } catch (err) {
+      console.error(chalk.red(`❌ Error getting video files: ${err.message}`));
+      return [];
+    }
+  }
+
+  /**
    * Find downloaded file by searching for files with video ID - ENHANCED
    */
   async findDownloadedFile(videoId, platform, timestamp) {
     try {
-      const files = fs.readdirSync(this.outputDir);
+      const files = this.getVideoFiles();
+      console.log(chalk.gray(`🔍 Searching among ${files.length} video files for: ${videoId}`));
       
       // Strategy 1: Look for files with exact timestamp pattern (most recent download)
       const timestampMatches = files.filter(file => {
         const lowerFile = file.toLowerCase();
         return lowerFile.includes(videoId.toLowerCase()) && 
-               lowerFile.includes(timestamp.toString()) &&
-               (lowerFile.endsWith('.mp4') || 
-                lowerFile.endsWith('.webm') || 
-                lowerFile.endsWith('.mkv')) &&
-               !lowerFile.endsWith('.part'); // Skip partial downloads
+               lowerFile.includes(timestamp.toString());
       });
       
       if (timestampMatches.length > 0) {
@@ -219,8 +268,8 @@ class MultiPlatformDownloader {
         return path.join(this.outputDir, timestampMatches[0]);
       }
       
-      // Strategy 2: Look for files with video ID from the last 5 minutes (recent downloads only)
-      const recentTime = Date.now() - (5 * 60 * 1000); // 5 minutes ago
+      // Strategy 2: Look for files with video ID from the last 10 minutes (recent downloads only)
+      const recentTime = Date.now() - (10 * 60 * 1000); // 10 minutes ago
       const recentMatches = files.filter(file => {
         const lowerFile = file.toLowerCase();
         const lowerVideoId = videoId.toLowerCase();
@@ -230,11 +279,7 @@ class MultiPlatformDownloader {
         
         return lowerFile.includes(lowerVideoId) &&
                lowerFile.includes(lowerPlatform) &&
-               stats.mtime.getTime() > recentTime && // Only recent files
-               (lowerFile.endsWith('.mp4') || 
-                lowerFile.endsWith('.webm') || 
-                lowerFile.endsWith('.mkv')) &&
-               !lowerFile.endsWith('.part');
+               stats.mtime.getTime() > recentTime; // Only recent files
       });
       
       if (recentMatches.length > 0) {
@@ -257,11 +302,7 @@ class MultiPlatformDownloader {
         const stats = fs.statSync(filePath);
         
         return lowerFile.startsWith(lowerPlatform) &&
-               stats.mtime.getTime() > recentTime && // Only recent files
-               (lowerFile.endsWith('.mp4') || 
-                lowerFile.endsWith('.webm') || 
-                lowerFile.endsWith('.mkv')) &&
-               !lowerFile.endsWith('.part');
+               stats.mtime.getTime() > recentTime; // Only recent files
       });
       
       if (platformMatches.length > 0) {
@@ -276,7 +317,29 @@ class MultiPlatformDownloader {
         return sortedFiles[0].path;
       }
       
+      // Strategy 4: Look for ANY recent video file (absolute last resort)
+      const allRecentFiles = files.filter(file => {
+        const filePath = path.join(this.outputDir, file);
+        const stats = fs.statSync(filePath);
+        return stats.mtime.getTime() > recentTime;
+      });
+      
+      if (allRecentFiles.length > 0) {
+        const sortedFiles = allRecentFiles.map(file => ({
+          name: file,
+          path: path.join(this.outputDir, file),
+          stats: fs.statSync(path.join(this.outputDir, file))
+        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
+        
+        console.log(chalk.yellow(`⚠️ Using most recent video file: ${sortedFiles[0].name}`));
+        return sortedFiles[0].path;
+      }
+      
       console.error(chalk.red(`❌ No matching files found for video ID: ${videoId}`));
+      
+      // Debug: List all files in directory
+      console.log(chalk.gray(`📁 Available files: ${files.join(', ')}`));
+      
       return null;
       
     } catch (err) {

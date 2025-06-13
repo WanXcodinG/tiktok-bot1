@@ -8,6 +8,7 @@ async function runInteractiveBot() {
   console.log(chalk.blueBright("📱 TikTok Multi-Platform Content Bot"));
   console.log(chalk.gray("Supports: YouTube, TikTok, Instagram, Facebook, Twitter"));
   console.log(chalk.green("🎯 Improved Search - Get exactly what you search for!"));
+  console.log(chalk.magenta("🤖 AI-Powered Video Analysis & Metadata Generation!"));
 
   const { inputType } = await inquirer.prompt([
     {
@@ -22,7 +23,6 @@ async function runInteractiveBot() {
   ]);
 
   let results = [];
-  let hashtags = "";
 
   if (inputType === "🔗 Provide direct URLs") {
     const { urls } = await inquirer.prompt([
@@ -44,8 +44,6 @@ async function runInteractiveBot() {
         ...result,
         videoId: result.actualVideoId || result.id || result.videoId
       }));
-
-      hashtags = "viral, fyp, trending, content";
       
     } catch (err) {
       console.error(chalk.red(`❌ Failed to download videos: ${err.message}`));
@@ -88,8 +86,6 @@ async function runInteractiveBot() {
         console.log(chalk.gray(`   📊 Search Rank: #${video.searchRank || 1}`));
         console.log(chalk.gray(`   ⏱️ Duration: ${video.duration || 'Unknown'}s`));
       }
-
-      hashtags = "viral, fyp, trending, content";
       
     } catch (err) {
       console.error(chalk.red(`❌ Failed to search and download: ${err.message}`));
@@ -185,8 +181,13 @@ async function runInteractiveBot() {
     console.log(chalk.yellow("🎵 Processing video audio..."));
     await processVideoAudio(editedPath, finalPath);
 
-    console.log(chalk.yellow("📝 Generating caption..."));
-    const caption = await generateCaption(hashtags);
+    console.log(chalk.yellow("🤖 Analyzing video and generating AI-powered caption..."));
+    // Use AI-powered caption generation with video analysis
+    const caption = await generateCaption(
+      finalPath, 
+      video.title || '', 
+      video.description || ''
+    );
 
     console.log(chalk.yellow("📤 Uploading to TikTok..."));
     await uploadToTikTok(finalPath, caption);
@@ -200,7 +201,8 @@ async function runInteractiveBot() {
       console.log(chalk.gray(`   Search Query: "${video.searchQuery}"`));
       console.log(chalk.gray(`   Relevance Score: ${video.relevanceScore || 'N/A'}`));
     }
-    console.log(chalk.gray(`   Caption: ${caption}`));
+    console.log(chalk.gray(`   AI Generated Caption:`));
+    console.log(chalk.blue(`   ${caption}`));
 
   } catch (err) {
     uploadSuccess = false;

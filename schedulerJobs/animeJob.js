@@ -1,15 +1,15 @@
-// runAnime.js
 const postVideo = require("../shared/postVideo");
-const getAnimeVideos = require("../fetch/getAnimeVideos");
+const chalk = require("chalk");
 
 module.exports = async function runAnime() {
   try {
-    console.log("✅ Posting anime video...");
+    console.log(chalk.cyan("🎌 Starting scheduled anime video post..."));
 
-    await postVideo("Anime Edited Videos", getAnimeVideos, "anime edit, fight scenes, Japanese animation");
+    // Use new multi-platform system
+    await postVideo("Anime Edited Videos", "Anime Edited Videos", "anime edit, fight scenes, Japanese animation");
 
-    console.log("✅ Anime video posted successfully.");
+    console.log(chalk.green("✅ Scheduled anime video posted successfully."));
   } catch (err) {
-    console.error("❌ Failed to post anime video:", err.message);
+    console.error(chalk.red("❌ Failed to post scheduled anime video:"), err.message);
   }
 };

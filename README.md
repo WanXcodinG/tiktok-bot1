@@ -1,203 +1,286 @@
-# 🤖 TikTok Content Bot
+# 🤖 TikTok Multi-Platform Content Bot
 
 [![Node.js](https://img.shields.io/badge/Node.js-v16+-green.svg)](https://nodejs.org)
 [![License](https://img.shields.io/github/license/your-username/tiktok-bot)](LICENSE)
 [![Made With](https://img.shields.io/badge/Made%20With-JavaScript-yellow)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![TikTok Automation](https://img.shields.io/badge/Automation-TikTok-blueviolet)](#)
 
-> ⚡ Automatically fetch, edit, caption, and upload content to TikTok using YouTube videos. Supports **anime edits**, **tech shorts**, **horror clips**, and **TikTok-style short films**.
+> ⚡ Automatically fetch, edit, caption, and upload content to TikTok from **multiple platforms** including YouTube, TikTok, Instagram, Facebook, and Twitter using **yt-dlp**. Supports **AI-generated captions**, **scheduled posting**, and **smart video processing**.
 
 ---
 
-## 🖼️ Preview
+## 🌐 Supported Platforms
 
-| CLI Interaction | TikTok Upload Bot |
-|-----------------|-------------------|
-| ![CLI Prompt](https://your-image-link.com/cli.png) | ![TikTok Upload](https://your-image-link.com/upload.png) |
+| Platform | Icon | Features | Max Duration |
+|----------|------|----------|--------------|
+| **YouTube** | 📺 | Search, Playlists, Subtitles | 12 hours |
+| **TikTok** | 🎵 | Vertical videos, Music | 10 minutes |
+| **Instagram** | 📸 | Stories, Reels, IGTV | 1 hour |
+| **Facebook** | 👥 | Live videos, Stories | 4 hours |
+| **Twitter/X** | 🐦 | Short clips | 2 minutes 20s |
 
 ---
 
 ## ✨ Features
 
-- 🎥 Fetches relevant videos from YouTube
-- 🧠 **AI-generated captions using Google Gemini** with trendy hashtags
-- 🎶 Adds background music based on category
-- 🤖 Automates TikTok uploads with Puppeteer
-- ⏱️ Supports scheduled posting
-- 🧹 Auto-cleans video folders daily
-- 🔄 Smart fallback system for captions
+- 🌐 **Multi-platform support** - Download from YouTube, TikTok, Instagram, Facebook, Twitter
+- 🔗 **Flexible input** - URLs, search queries, or category-based content
+- 🧠 **AI-generated captions** using Google Gemini with trendy hashtags
+- 🎶 **Smart music integration** based on video category
+- 🤖 **Automated TikTok uploads** with Puppeteer
+- ⏱️ **Scheduled posting** with cron jobs
+- 🧹 **Auto-cleanup** of old video files
+- 🎬 **Professional video editing** with FFmpeg
+- 📊 **Platform-specific optimization**
 
 ---
 
 ## 🧰 Requirements
 
-- Node.js v16+
-- FFMPEG (must be installed and added to your PATH)
+- **Node.js v16+**
+- **FFmpeg** (must be installed and added to PATH)
+- **yt-dlp** (automatically installed via npm)
 - **Google Gemini API Key** (free from Google AI Studio)
-- TikTok login session (cookie-based)
+- **TikTok account** for uploads
+
+---
+
+## 🚀 Quick Start
+
+### 1. **Installation**
+```bash
+git clone https://github.com/TA-wiah/tiktok-bot.git
+cd tiktok-bot
+npm install
+```
+
+### 2. **Setup Environment**
+```bash
+cp .env.example .env
+```
+
+Edit `.env` file:
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+Get your free Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+
+### 3. **Run the Bot**
+```bash
+npm start
+```
+
+---
+
+## 🎯 Usage Options
+
+### **📂 Category-Based Content**
+Choose from pre-configured categories:
+- 🎌 **Anime Edited Videos** - AMVs and fight scenes
+- 🤖 **Tech Shorts** - AI, gadgets, programming
+- 👻 **Horror Clips** - Scary stories and thrillers  
+- 🎬 **Made-Up TikTok Movies** - Short films and stories
+- 🎵 **TikTok Viral** - Trending TikTok content
+- 📸 **Instagram Reels** - Viral Instagram content
+
+### **🔗 Direct URLs**
+Paste any supported platform URL:
+```
+https://youtube.com/watch?v=VIDEO_ID
+https://tiktok.com/@user/video/VIDEO_ID
+https://instagram.com/p/POST_ID
+https://facebook.com/watch/?v=VIDEO_ID
+https://twitter.com/user/status/TWEET_ID
+```
+
+### **🔍 Search by Keywords**
+Search any platform with custom keywords:
+```
+"anime fight scenes"
+"AI technology 2024"
+"horror short films"
+```
 
 ---
 
 ## 🧭 Project Structure
+
 ```
-├── bot.js # Interactive CLI for user-driven posts 
-├── scheduler.js # Cron job for daily automated posts 
-├── fetch/ # Video grabbers for each category 
-├── edit/ # Editor & music overlay 
-├── upload/ # TikTok upload logic using Puppeteer 
-├── shared/ # Shared posting utility 
-├── utils/ # Caption generator with Gemini AI, cleanup 
-├── videos/ # Raw and edited video folders 
-│ ├── raw/ 
-│ └── edited/ 
-├── .env # Contains API keys and secrets 
-└── index.js # Entrypoint (optional)
+tiktok-bot/
+├── 📁 fetch/                    # Multi-platform downloaders
+│   ├── multiPlatformDownloader.js  # Core yt-dlp wrapper
+│   ├── getMultiPlatformVideos.js   # Main fetching logic
+│   └── legacy fetchers...           # YouTube-only fetchers
+├── 📁 edit/                     # Video processing
+│   ├── animeEditor.js              # FFmpeg video editor
+│   └── addMusic.js                 # Music overlay system
+├── 📁 upload/                   # TikTok automation
+│   └── tiktokUploader.js           # Puppeteer uploader
+├── 📁 utils/                    # Utilities
+│   ├── generateCaption.js          # Gemini AI captions
+│   ├── platformUtils.js            # Platform detection
+│   └── cleanupOldVideos.js         # File cleanup
+├── 📁 schedulerJobs/            # Automated posting
+├── 📁 videos/                   # Video storage
+│   ├── raw/                        # Downloaded videos
+│   └── edited/                     # Processed videos
+├── bot.js                       # Interactive CLI
+├── scheduler.js                 # Cron job manager
+└── index.js                     # Main entry point
 ```
----
-
-## ⚙️ Setup
-
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/TA-wiah/tiktok-bot.git
-   cd tiktok-bot
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Get Google Gemini API Key**
-   - Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-   - Create a new API key (it's free!)
-   - Copy your API key
-
-4. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` file:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   TIKTOK_SESSION=your_cookie_session_optional
-   ```
-
-5. **Run interactively**
-   ```bash
-   node bot.js
-   ```
-
-6. **Run scheduled tasks**
-   ```bash
-   node scheduler.js
-   ```
 
 ---
 
 ## 🤖 AI Caption Generation
 
-The bot now uses **Google Gemini AI** for intelligent caption generation:
+Powered by **Google Gemini AI** for intelligent, context-aware captions:
 
-### ✅ **Smart Features:**
-- **Context-aware captions** based on video category
-- **Trending hashtags** automatically included
-- **Emoji integration** for better engagement
-- **Character limit optimization** for TikTok
-- **Fallback system** if API is unavailable
+### **Smart Features:**
+- 🎯 **Context-aware** based on video content and platform
+- 📈 **Trending hashtags** automatically included
+- 😊 **Emoji optimization** for better engagement
+- 📏 **Character limits** optimized for TikTok
+- 🔄 **Fallback system** with pre-written captions
 
-### 📝 **Caption Examples:**
-- **Anime:** `🔥 This anime fight scene hits different #anime #edit #fyp #viral`
-- **Tech:** `🤖 AI technology that will blow your mind #tech #ai #future #fyp`
-- **Horror:** `😱 Why did I watch this at 3AM? #horror #scary #creepy #fyp`
-- **Movies:** `📱 Made entirely on phone! Plot twist 🎬 #shortfilm #creative #fyp`
-
----
-
-## 🔧 Customization
-
-You can:
-
-✨ **Add more fetch categories** (fetch/)
-
-🧱 **Replace TikTok uploader** with your own logic
-
-🎵 **Change or add music tracks** in addMusicToVideo
-
-🤖 **Customize AI prompts** in generateCaption.js
+### **Example Captions:**
+```
+🔥 This anime fight scene hits different #anime #edit #fyp #viral
+🤖 AI technology that will blow your mind #tech #ai #future #fyp  
+😱 Why did I watch this at 3AM? #horror #scary #creepy #fyp
+📱 Made entirely on phone! Plot twist 🎬 #shortfilm #creative #fyp
+```
 
 ---
 
-## 🧹 Auto Cleanup
+## ⚙️ Advanced Configuration
 
-The bot runs a cron job every day at 3:00 AM to delete old videos:
+### **Platform-Specific Settings**
 ```javascript
-cron.schedule("0 3 * * *", cleanup);
+// Automatic quality optimization per platform
+const settings = {
+  'YouTube': { quality: '1080p', aspectRatio: '16:9' },
+  'TikTok': { quality: '720p', aspectRatio: '9:16' },
+  'Instagram': { quality: '720p', aspectRatio: '9:16' },
+  'Facebook': { quality: '720p', aspectRatio: '16:9' },
+  'Twitter': { quality: '720p', aspectRatio: '16:9' }
+};
+```
+
+### **Custom Download Options**
+```javascript
+const options = {
+  quality: 1080,        // Max resolution
+  audioOnly: false,     // Download audio only
+  platform: 'YouTube',  // Preferred platform
+  limit: 5             // Number of videos
+};
 ```
 
 ---
 
-## 💡 Example Output
+## 📅 Scheduled Posting
+
+Set up automated posting with cron jobs:
+
+```bash
+node scheduler.js
+```
+
+**Schedule Options:**
+- ⏰ **Daily posting** at specific times
+- 📊 **Multiple categories** with different schedules  
+- 🔄 **Automatic content rotation**
+- 🧹 **Daily cleanup** at 3:00 AM
+
+---
+
+## 💡 Example Workflow
 
 ```
-📱 TikTok Content Bot
-> You selected: Anime Edited Videos
+📱 TikTok Multi-Platform Content Bot
+Supports: YouTube, TikTok, Instagram, Facebook, Twitter
 
-🔎 Searching YouTube for anime edits...
-📥 Downloading video...
+? How do you want to get videos? 🔗 Provide direct URLs
+? Enter video URLs: https://youtube.com/watch?v=abc123
+? What category best describes these videos? Anime Edited Videos
+
+🌐 Multi-Platform Video Fetcher Started
+✅ Detected 📺 YouTube: https://youtube.com/watch?v=abc123
+📥 Downloading from YouTube...
+✅ Downloaded successfully! Size: 45.2MB
+
+🎬 Processing: Epic Anime Fight Compilation
+📱 Platform: YouTube
 🎬 Editing video...
-🎶 Adding music...
-🧠 Generating caption with Gemini for: anime edit, fight scenes
+🎵 Adding music...
+📝 Generating caption...
 🤖 Calling Gemini API...
 ✅ Gemini Generated Caption: 🔥 Epic anime fight that hits different #anime #edit #fyp #viral
 📤 Uploading to TikTok...
-🚀 Posted to TikTok!
+🚀 Video posted successfully!
 ```
 
 ---
 
-## 🔑 API Keys & Setup
-
-### **Google Gemini API (Free)**
-1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Sign in with your Google account
-3. Click "Create API Key"
-4. Copy and paste into your `.env` file
-
-### **TikTok Session (Optional)**
-- The bot will automatically save your login session after first use
-- Manual cookie setup is optional
-
----
-
-## 🚨 Troubleshooting
+## 🔧 Troubleshooting
 
 ### **Common Issues:**
 
-**❌ "GEMINI_API_KEY not found"**
-- Make sure you created a `.env` file
-- Check that your API key is correctly set
-- Verify the API key is active in Google AI Studio
+**❌ "yt-dlp not found"**
+- The package installs automatically via npm
+- Restart your terminal after installation
 
-**❌ "Failed to generate caption"**
-- Bot will automatically use fallback captions
+**❌ "Platform not supported"**  
+- Check the supported platforms list above
+- Ensure URL format is correct
+
+**❌ "Download failed"**
+- Some videos may be geo-restricted
+- Try different videos from the same platform
 - Check your internet connection
-- Verify API key permissions
 
-**❌ "Video upload failed"**
-- Make sure you're logged into TikTok in the browser
-- Check if video file exists and is valid
-- Try clearing cookies and logging in again
+**❌ "GEMINI_API_KEY not found"**
+- Create a `.env` file in the project root
+- Get your free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+
+---
+
+## 🔒 Privacy & Ethics
+
+- ✅ **Respects platform rate limits**
+- ✅ **Only downloads publicly available content**
+- ✅ **Adds delays between downloads**
+- ✅ **Follows platform terms of service**
+- ⚠️ **Always credit original creators**
+- ⚠️ **Use for educational/personal purposes**
 
 ---
 
 ## 🙌 Contributing
 
-Forks, stars ⭐, issues, and pull requests are welcome!
+We welcome contributions! Here's how you can help:
+
+- 🐛 **Report bugs** via GitHub issues
+- 💡 **Suggest features** for new platforms or functionality
+- 🔧 **Submit pull requests** with improvements
+- ⭐ **Star the repo** if you find it useful
+- 📖 **Improve documentation**
 
 ---
 
 ## 📄 License
 
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **BSD 3-Clause License** - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🚨 Disclaimer
+
+This tool is for educational and personal use only. Always respect:
+- Platform terms of service
+- Copyright laws
+- Content creator rights
+- Rate limits and fair usage
+
+**Use responsibly and ethically!** 🙏

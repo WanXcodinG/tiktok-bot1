@@ -4,120 +4,226 @@ const chalk = require("chalk");
 require("dotenv").config();
 const cron = require("node-cron");
 const cleanup = require("./utils/cleanupOldVideos");
+const { getMultiPlatformVideos, getVideosByCategory } = require("./fetch/getMultiPlatformVideos");
 
 cron.schedule("0 3 * * *", cleanup); // 🕒 runs daily at 3:00 AM
 
-
 async function main() {
-  console.log(chalk.blueBright("📱 TikTok Content Bot"));
+  console.log(chalk.blueBright("📱 TikTok Multi-Platform Content Bot"));
+  console.log(chalk.gray("Supports: YouTube, TikTok, Instagram, Facebook, Twitter"));
 
-  const { category } = await inquirer.prompt([
+  const { inputType } = await inquirer.prompt([
     {
       type: "list",
-      name: "category",
-      message: "What type of content do you want to post?",
+      name: "inputType",
+      message: "How do you want to get videos?",
       choices: [
-        "Anime Edited Videos",
-        "Tech Shorts",
-        "Horror Clips",
-        "Made-Up TikTok Movies",
+        "📂 Choose from categories",
+        "🔗 Provide direct URLs",
+        "🔍 Search by keyword"
       ],
     },
   ]);
 
-  console.log(chalk.green(`> You selected: ${category}`));
+  let results = [];
+  let category = "";
+  let hashtags = "";
 
+  if (inputType === "📂 Choose from categories") {
+    const { selectedCategory } = await inquirer.prompt([
+      {
+        type: "list",
+        name: "selectedCategory",
+        message: "What type of content do you want to post?",
+        choices: [
+          "Anime Edited Videos",
+          "Tech Shorts", 
+          "Horror Clips",
+          "Made-Up TikTok Movies",
+          "TikTok Viral",
+          "Instagram Reels"
+        ],
+      },
+    ]);
+
+    category = selectedCategory;
+    console.log(chalk.green(`> You selected: ${category}`));
+
+    try {
+      results = await getVideosByCategory(category, 1);
+      hashtags = results[0]?.hashtags || "viral, fyp, trending";
+    } catch (err) {
+      console.error(chalk.red(`❌ Failed to get ${category} videos: ${err.message}`));
+      return;
+    }
+
+  } else if (inputType === "🔗 Provide direct URLs") {
+    const { urls } = await inquirer.prompt([
+      {
+        type: "input",
+        name: "urls",
+        message: "Enter video URLs (comma-separated for multiple):",
+        validate: input => input.trim().length > 0 || "Please enter at least one URL"
+      },
+    ]);
+
+    const { videoCategory } = await inquirer.prompt([
+      {
+        type: "list",
+        name: "videoCategory",
+        message: "What category best describes these videos?",
+        choices: [
+          "Anime Edited Videos",
+          "Tech Shorts",
+          "Horror Clips", 
+          "Made-Up TikTok Movies",
+          "General/Other"
+        ],
+      },
+    ]);
+
+    const urlList = urls.split(',').map(url => url.trim()).filter(url => url);
+    category = videoCategory;
+    
+    try {
+      results = await getMultiPlatformVideos(urlList, { quality: 1080 });
+      
+      // Add category info
+      results = results.map(result => ({
+        ...result,
+        category: category,
+        videoId: result.id
+      }));
+
+      // Set hashtags based on category
+      const categoryHashtags = {
+        "Anime Edited Videos": "anime edit, fight scenes, Japanese animation",
+        "Tech Shorts": "tech, ai, gadgets, programming", 
+        "Horror Clips": "horror, scary, thriller, creepy",
+        "Made-Up TikTok Movies": "shortfilm, storytime, acting, movie",
+        "General/Other": "viral, fyp, trending, content"
+      };
+      
+      hashtags = categoryHashtags[category] || "viral, fyp, trending";
+      
+    } catch (err) {
+      console.error(chalk.red(`❌ Failed to download videos: ${err.message}`));
+      return;
+    }
+
+  } else if (inputType === "🔍 Search by keyword") {
+    const { searchQuery } = await inquirer.prompt([
+      {
+        type: "input",
+        name: "searchQuery",
+        message: "Enter search keywords:",
+        validate: input => input.trim().length > 0 || "Please enter search keywords"
+      },
+    ]);
+
+    const { platform } = await inquirer.prompt([
+      {
+        type: "list",
+        name: "platform",
+        message: "Which platform to search?",
+        choices: ["YouTube", "All Platforms"],
+      },
+    ]);
+
+    const { videoCategory } = await inquirer.prompt([
+      {
+        type: "list", 
+        name: "videoCategory",
+        message: "What category best describes this search?",
+        choices: [
+          "Anime Edited Videos",
+          "Tech Shorts",
+          "Horror Clips",
+          "Made-Up TikTok Movies", 
+          "General/Other"
+        ],
+      },
+    ]);
+
+    category = videoCategory;
+    
+    try {
+      results = await getMultiPlatformVideos(searchQuery, {
+        platform: platform === "All Platforms" ? "YouTube" : platform,
+        limit: 1,
+        quality: 1080
+      });
+
+      // Add category info
+      results = results.map(result => ({
+        ...result,
+        category: category,
+        videoId: result.id
+      }));
+
+      // Set hashtags based on category
+      const categoryHashtags = {
+        "Anime Edited Videos": "anime edit, fight scenes, Japanese animation",
+        "Tech Shorts": "tech, ai, gadgets, programming",
+        "Horror Clips": "horror, scary, thriller, creepy", 
+        "Made-Up TikTok Movies": "shortfilm, storytime, acting, movie",
+        "General/Other": "viral, fyp, trending, content"
+      };
+      
+      hashtags = categoryHashtags[category] || "viral, fyp, trending";
+      
+    } catch (err) {
+      console.error(chalk.red(`❌ Failed to search and download: ${err.message}`));
+      return;
+    }
+  }
+
+  if (!results || results.length === 0) {
+    console.error(chalk.red("❌ No videos found to process"));
+    return;
+  }
+
+  // Process the first video
+  const video = results[0];
+  console.log(chalk.cyan(`🎬 Processing: ${video.title}`));
+  console.log(chalk.gray(`📱 Platform: ${video.platform}`));
+  console.log(chalk.gray(`📁 File: ${video.localPath}`));
+
+  // Import processing modules
   const generateCaption = require("./utils/generateCaption");
   const editAnimeVideo = require("./edit/animeEditor");
   const addMusicToVideo = require("./edit/addMusic");
   const uploadToTikTok = require("./upload/tiktokUploader");
 
-  switch (category) {
-    case "Anime Edited Videos": {
-      const getAnimeVideos = require("./fetch/getAnimeVideos");
-      const results = await getAnimeVideos(1);
-      const videoId = results[0].videoId;
+  try {
+    const rawPath = video.localPath;
+    const editedPath = `./videos/edited/${video.videoId}-edited.mp4`;
+    const finalPath = `./videos/edited/${video.videoId}-final.mp4`;
 
-      const rawPath = `./videos/raw/${videoId}.mp4`;
-      const editedPath = `./videos/edited/${videoId}-edited.mp4`;
-      const finalPath = `./videos/edited/${videoId}-final.mp4`;
+    console.log(chalk.yellow("🎬 Editing video..."));
+    await editAnimeVideo(rawPath, editedPath);
 
-      await editAnimeVideo(rawPath, editedPath);
-      await addMusicToVideo(editedPath, finalPath);
+    console.log(chalk.yellow("🎵 Adding music..."));
+    const musicCategory = category.toLowerCase().includes('anime') ? 'anime' : 
+                         category.toLowerCase().includes('tech') ? 'tech' :
+                         category.toLowerCase().includes('horror') ? 'horror' : 'anime';
+    await addMusicToVideo(editedPath, finalPath, musicCategory);
 
-      const caption = await generateCaption("anime edit, fight scenes, Japanese animation");
-      await uploadToTikTok(finalPath, caption);
-      break;
-    }
+    console.log(chalk.yellow("📝 Generating caption..."));
+    const caption = await generateCaption(hashtags);
 
-    case "Tech Shorts": {
-      const getTechVideos = require("./fetch/getTechVideos");
-      const results = await getTechVideos(1);
-      const videoId = results[0].videoId;
+    console.log(chalk.yellow("📤 Uploading to TikTok..."));
+    await uploadToTikTok(finalPath, caption);
 
-      const rawPath = `./videos/raw/${videoId}.mp4`;
-      const editedPath = `./videos/edited/${videoId}-edited.mp4`;
-      const finalPath = `./videos/edited/${videoId}-final.mp4`;
-      await editAnimeVideo(rawPath, editedPath); // reuse editor
-      await addMusicToVideo(editedPath, finalPath, "tech");
+    console.log(chalk.green("🚀 Video posted successfully!"));
+    console.log(chalk.cyan(`📊 Summary:`));
+    console.log(chalk.gray(`   Title: ${video.title}`));
+    console.log(chalk.gray(`   Platform: ${video.platform}`));
+    console.log(chalk.gray(`   Category: ${category}`));
+    console.log(chalk.gray(`   Caption: ${caption}`));
 
-      // inside each case block in bot.js
-      const postVideo = require("./shared/postVideo");
-      const getAnimeVideos = require("./fetch/getAnimeVideos");
-      await postVideo("Tech", getTechVideos, "tech, ai, gadgets, programming");
-
-      const caption = await generateCaption("tech content, gadgets, AI tools, coding tips");
-      await uploadToTikTok(finalPath, caption);
-      break;
-    }
-
-    case "Horror Clips": {
-      const getHorrorVideos = require("./fetch/getHorrorVideos");
-      const results = await getHorrorVideos(1);
-      const videoId = results[0].videoId;
-
-      const rawPath = `./videos/raw/${videoId}.mp4`;
-      const editedPath = `./videos/edited/${videoId}-edited.mp4`;
-      const finalPath = `./videos/edited/${videoId}-final.mp4`;
-
-      await editAnimeVideo(rawPath, editedPath); // reuse editor
-      await addMusicToVideo(editedPath, finalPath, "horror");
-
-      // inside each case block in bot.js
-    const postVideo = require("./shared/postVideo");
-    const getAnimeVideos = require("./fetch/getAnimeVideos");
-    await postVideo("Horror", getHorrorVideos, "horror, scary, thriller, creepy");
-
-
-      const caption = await generateCaption("horror short film, scary story, spooky night");
-      await uploadToTikTok(finalPath, caption);
-      break;
-    }
-
-    case "Made-Up TikTok Movies": {
-      const getMovies = require("./fetch/getTikTokMovies");
-      const results = await getMovies(1);
-      const videoId = results[0].videoId;
-
-      const rawPath = `./videos/raw/${videoId}.mp4`;
-      const editedPath = `./videos/edited/${videoId}-edited.mp4`;
-      const finalPath = `./videos/edited/${videoId}-final.mp4`;
-
-      await editAnimeVideo(rawPath, editedPath); // reuse editor
-      await addMusicToVideo(editedPath, finalPath, "made-up tiktok movies sound");
-
-      // inside each case block in bot.js
-      const postVideo = require("./shared/postVideo");
-      const getAnimeVideos = require("./fetch/getAnimeVideos");
-      await postVideo("TikTok Movie", getMovies, "shortfilm, storytime, acting, movie");
-
-      const caption = await generateCaption("short movie, tiktok drama, storytime series");
-      await uploadToTikTok(finalPath, caption);
-      break;
-    }
-
-    default:
-      console.log(chalk.red("❌ Invalid category selected."));
+  } catch (err) {
+    console.error(chalk.red(`❌ Error processing video: ${err.message}`));
   }
 }
 

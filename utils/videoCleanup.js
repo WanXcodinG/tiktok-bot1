@@ -12,10 +12,46 @@ class VideoCleanup {
     this.editedDir = path.join(__dirname, '../videos/edited');
     this.musicDir = path.join(__dirname, '../assets/music');
     
+    // Track protected files (recently downloaded)
+    this.protectedFiles = new Set();
+    
     // Ensure directories exist
     fs.ensureDirSync(this.rawDir);
     fs.ensureDirSync(this.editedDir);
     fs.ensureDirSync(this.musicDir);
+  }
+
+  /**
+   * Protect a file from cleanup for a specified duration
+   */
+  protectFile(filePath, durationMinutes = 30) {
+    try {
+      const absolutePath = path.resolve(filePath);
+      this.protectedFiles.add(absolutePath);
+      
+      console.log(chalk.blue(`🛡️ Protected file from cleanup: ${path.basename(filePath)} (${durationMinutes}min)`));
+      
+      // Remove protection after specified duration
+      setTimeout(() => {
+        this.protectedFiles.delete(absolutePath);
+        console.log(chalk.gray(`🔓 Protection expired for: ${path.basename(filePath)}`));
+      }, durationMinutes * 60 * 1000);
+      
+    } catch (err) {
+      console.error(chalk.red(`❌ Error protecting file: ${err.message}`));
+    }
+  }
+
+  /**
+   * Check if file is protected from cleanup
+   */
+  isFileProtected(filePath) {
+    try {
+      const absolutePath = path.resolve(filePath);
+      return this.protectedFiles.has(absolutePath);
+    } catch (err) {
+      return false;
+    }
   }
 
   /**
@@ -38,7 +74,7 @@ class VideoCleanup {
   }
 
   /**
-   * Check for duplicate files and remove older ones
+   * Check for duplicate files and remove older ones - IMPROVED
    */
   async removeDuplicates(directory) {
     try {
@@ -49,7 +85,8 @@ class VideoCleanup {
       }
       
       const files = fs.readdirSync(directory).filter(file => 
-        file.endsWith('.mp4') || file.endsWith('.mp3') || file.endsWith('.wav')
+        (file.endsWith('.mp4') || file.endsWith('.mp3') || file.endsWith('.wav')) &&
+        !file.endsWith('.part') // Skip partial downloads
       );
       
       if (files.length === 0) {
@@ -62,6 +99,13 @@ class VideoCleanup {
       // Calculate hashes for all files
       for (const file of files) {
         const filePath = path.join(directory, file);
+        
+        // Skip protected files
+        if (this.isFileProtected(filePath)) {
+          console.log(chalk.blue(`🛡️ Skipping protected file: ${file}`));
+          continue;
+        }
+        
         const stats = fs.statSync(filePath);
         const hash = await this.calculateFileHash(filePath);
         
@@ -87,8 +131,13 @@ class VideoCleanup {
       // Remove duplicates
       for (const duplicatePath of duplicates) {
         try {
-          await fs.remove(duplicatePath);
-          console.log(chalk.yellow(`🗑️ Removed duplicate: ${path.basename(duplicatePath)}`));
+          // Double-check protection before deletion
+          if (!this.isFileProtected(duplicatePath)) {
+            await fs.remove(duplicatePath);
+            console.log(chalk.yellow(`🗑️ Removed duplicate: ${path.basename(duplicatePath)}`));
+          } else {
+            console.log(chalk.blue(`🛡️ Skipped protected duplicate: ${path.basename(duplicatePath)}`));
+          }
         } catch (err) {
           console.error(chalk.red(`❌ Failed to remove duplicate ${duplicatePath}: ${err.message}`));
         }
@@ -129,6 +178,12 @@ class VideoCleanup {
             
             if (fileContainsId) {
               const filePath = path.join(dir, file);
+              
+              // Skip protected files
+              if (this.isFileProtected(filePath)) {
+                console.log(chalk.blue(`🛡️ Skipping protected file: ${file}`));
+                continue;
+              }
               
               // Skip original file if keepOriginal is true
               if (keepOriginal && dir === this.rawDir && !file.includes('-edited') && !file.includes('-final')) {
@@ -187,7 +242,7 @@ class VideoCleanup {
         
         for (const filePath of processedFiles) {
           try {
-            if (fs.existsSync(filePath)) {
+            if (fs.existsSync(filePath) && !this.isFileProtected(filePath)) {
               await fs.remove(filePath);
               console.log(chalk.gray(`🗑️ Removed processed file: ${path.basename(filePath)}`));
             }
@@ -197,7 +252,7 @@ class VideoCleanup {
         }
       }
       
-      // Always check for duplicates after cleanup
+      // Always check for duplicates after cleanup (but respect protections)
       await this.removeDuplicates(this.rawDir);
       await this.removeDuplicates(this.editedDir);
       
@@ -207,7 +262,7 @@ class VideoCleanup {
   }
 
   /**
-   * Clean old files based on age
+   * Clean old files based on age - IMPROVED WITH PROTECTION
    */
   async cleanupOldFiles(maxAgeHours = 24) {
     try {
@@ -222,10 +277,19 @@ class VideoCleanup {
       for (const dir of directories) {
         if (!fs.existsSync(dir)) continue;
         
-        const files = fs.readdirSync(dir);
+        const files = fs.readdirSync(dir).filter(file => 
+          !file.endsWith('.part') // Skip partial downloads
+        );
         
         for (const file of files) {
           const filePath = path.join(dir, file);
+          
+          // Skip protected files
+          if (this.isFileProtected(filePath)) {
+            console.log(chalk.blue(`🛡️ Skipping protected file: ${file}`));
+            continue;
+          }
+          
           const stats = fs.statSync(filePath);
           const fileAge = now - stats.mtime.getTime();
           
@@ -264,7 +328,7 @@ class VideoCleanup {
       }
       
       const musicFiles = fs.readdirSync(this.musicDir)
-        .filter(file => file.endsWith('.mp3') || file.endsWith('.wav'))
+        .filter(file => (file.endsWith('.mp3') || file.endsWith('.wav')) && !file.endsWith('.part'))
         .map(file => {
           const filePath = path.join(this.musicDir, file);
           const stats = fs.statSync(filePath);
@@ -283,8 +347,11 @@ class VideoCleanup {
         
         for (const file of filesToRemove) {
           try {
-            await fs.remove(file.path);
-            console.log(chalk.gray(`🗑️ Removed old music: ${file.name}`));
+            // Skip protected files
+            if (!this.isFileProtected(file.path)) {
+              await fs.remove(file.path);
+              console.log(chalk.gray(`🗑️ Removed old music: ${file.name}`));
+            }
           } catch (err) {
             console.error(chalk.red(`❌ Failed to remove music ${file.path}: ${err.message}`));
           }
@@ -321,7 +388,9 @@ class VideoCleanup {
       
       for (const { key, path: dirPath } of directories) {
         if (fs.existsSync(dirPath)) {
-          const files = fs.readdirSync(dirPath);
+          const files = fs.readdirSync(dirPath).filter(file => 
+            !file.endsWith('.part') // Skip partial downloads
+          );
           
           for (const file of files) {
             const filePath = path.join(dirPath, file);
@@ -350,7 +419,7 @@ class VideoCleanup {
   }
 
   /**
-   * Comprehensive cleanup - run all cleanup operations
+   * Comprehensive cleanup - run all cleanup operations - IMPROVED
    */
   async performFullCleanup() {
     try {
@@ -362,13 +431,13 @@ class VideoCleanup {
         console.log(chalk.gray(`📊 Initial storage: ${initialStats.total.sizeMB}MB (${initialStats.total.count} files)`));
       }
       
-      // Remove duplicates
+      // Remove duplicates (respecting protections)
       await this.removeDuplicates(this.rawDir);
       await this.removeDuplicates(this.editedDir);
       await this.removeDuplicates(this.musicDir);
       
-      // Clean old files (older than 6 hours)
-      await this.cleanupOldFiles(6);
+      // Clean old files (older than 24 hours, respecting protections)
+      await this.cleanupOldFiles(24);
       
       // Manage music files
       await this.cleanupUnusedMusic(8);

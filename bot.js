@@ -186,10 +186,6 @@ async function runInteractiveBot() {
   // Initialize cleanup utility
   const videoCleanup = new VideoCleanup();
   
-  // Perform initial cleanup to remove duplicates and old files
-  console.log(chalk.cyan("🧹 Performing initial cleanup..."));
-  await videoCleanup.performFullCleanup();
-
   // Process the first video
   const video = results[0];
   const videoId = video.videoId || video.actualVideoId || video.id;
@@ -201,6 +197,15 @@ async function runInteractiveBot() {
   if (video.searchTerm) {
     console.log(chalk.magenta(`🎲 Random search used: "${video.searchTerm}"`));
   }
+
+  // PROTECT THE DOWNLOADED FILE FROM CLEANUP
+  if (video.localPath) {
+    videoCleanup.protectFile(video.localPath, 60); // Protect for 60 minutes
+  }
+
+  // Perform initial cleanup AFTER protecting the file
+  console.log(chalk.cyan("🧹 Performing initial cleanup..."));
+  await videoCleanup.performFullCleanup();
 
   // Import processing modules
   const generateCaption = require("./utils/generateCaption");
@@ -224,21 +229,26 @@ async function runInteractiveBot() {
       const videoDir = path.dirname(rawPath);
       
       if (fs.existsSync(videoDir)) {
-        const files = fs.readdirSync(videoDir);
+        const files = fs.readdirSync(videoDir).filter(file => 
+          !file.endsWith('.part') && // Skip partial downloads
+          (file.endsWith('.mp4') || file.endsWith('.webm') || file.endsWith('.mkv'))
+        );
         console.log(chalk.gray(`📁 Files in directory: ${files.join(', ')}`));
         
         // Look for files containing the video ID
         const matchingFiles = files.filter(file => {
           const lowerFile = file.toLowerCase();
           const lowerVideoId = videoId.toLowerCase();
-          return lowerFile.includes(lowerVideoId) && 
-                 (lowerFile.endsWith('.mp4') || lowerFile.endsWith('.webm') || lowerFile.endsWith('.mkv'));
+          return lowerFile.includes(lowerVideoId);
         });
         
         if (matchingFiles.length > 0) {
           const foundFile = path.join(videoDir, matchingFiles[0]);
           console.log(chalk.green(`✅ Found matching file: ${foundFile}`));
           video.localPath = foundFile; // Update the path
+          
+          // Protect the found file too
+          videoCleanup.protectFile(foundFile, 60);
         } else {
           throw new Error(`❌ No video file found for ID: ${videoId}`);
         }

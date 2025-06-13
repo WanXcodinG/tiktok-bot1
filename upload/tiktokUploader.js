@@ -163,7 +163,7 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
 
     await wait(3000);
 
-    // 🚀 Click Post button using the specific selector you provided
+    // 🚀 Click Post button using multiple strategies
     try {
       console.log("🚀 Looking for Post button...");
       let posted = false;

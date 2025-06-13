@@ -14,6 +14,11 @@ async function getMultiPlatformVideos(sources, options = {}) {
   try {
     // Handle different input types
     if (typeof sources === 'string') {
+      // Validate input string
+      if (!sources || sources.trim().length === 0) {
+        throw new Error('Empty search query or URL provided');
+      }
+      
       // Single URL or search query
       if (downloader.isValidUrl(sources)) {
         console.log(chalk.blue(`📥 Downloading from URL: ${sources}`));
@@ -31,6 +36,10 @@ async function getMultiPlatformVideos(sources, options = {}) {
       }
     } else if (Array.isArray(sources)) {
       // Multiple URLs
+      if (sources.length === 0) {
+        throw new Error('Empty URL array provided');
+      }
+      
       console.log(chalk.blue(`📥 Downloading ${sources.length} videos...`));
       const downloadResults = await downloader.downloadMultiple(sources, options);
       results.push(...downloadResults);

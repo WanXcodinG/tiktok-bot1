@@ -30,6 +30,10 @@ class MultiPlatformDownloader {
    */
   detectPlatform(url) {
     try {
+      if (!url || typeof url !== 'string') {
+        return 'Invalid URL';
+      }
+      
       const urlObj = new URL(url);
       const hostname = urlObj.hostname.replace('www.', '').replace('m.', '');
       
@@ -49,6 +53,10 @@ class MultiPlatformDownloader {
    */
   async getVideoInfo(url) {
     try {
+      if (!this.isValidUrl(url)) {
+        throw new Error('Invalid URL provided');
+      }
+      
       console.log(chalk.blue(`🔍 Getting video info from: ${this.detectPlatform(url)}`));
       
       const info = await this.ytDlp.getVideoInfo(url);
@@ -84,6 +92,10 @@ class MultiPlatformDownloader {
    */
   async downloadVideo(url, options = {}) {
     try {
+      if (!this.isValidUrl(url)) {
+        throw new Error('Invalid URL provided for download');
+      }
+      
       const platform = this.detectPlatform(url);
       console.log(chalk.cyan(`📥 Downloading from ${platform}...`));
       
@@ -101,7 +113,7 @@ class MultiPlatformDownloader {
       // Download options based on platform
       const downloadOptions = this.getDownloadOptions(platform, options);
       
-      // Execute download
+      // Execute download with proper error handling
       const command = [
         url,
         '-o', outputTemplate,
@@ -110,7 +122,12 @@ class MultiPlatformDownloader {
       
       console.log(chalk.gray(`🔧 Command: yt-dlp ${command.join(' ')}`));
       
-      await this.ytDlp.exec(command);
+      try {
+        await this.ytDlp.exec(command);
+      } catch (ytDlpError) {
+        console.error(chalk.red(`❌ yt-dlp error: ${ytDlpError.message}`));
+        throw new Error(`Download failed: ${ytDlpError.message}`);
+      }
       
       // Find the downloaded file
       const downloadedFile = await this.findDownloadedFile(videoId, platform);
@@ -259,6 +276,10 @@ class MultiPlatformDownloader {
     
     for (const url of urls) {
       try {
+        if (!this.isValidUrl(url)) {
+          throw new Error('Invalid URL format');
+        }
+        
         const result = await this.downloadVideo(url, options);
         results.push(result);
         
@@ -285,6 +306,10 @@ class MultiPlatformDownloader {
    */
   async searchAndDownload(query, platform = 'YouTube', limit = 1) {
     try {
+      if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        throw new Error('Invalid search query provided');
+      }
+      
       console.log(chalk.blue(`🔍 Searching ${platform} for: "${query}"`));
       
       if (platform.toLowerCase() !== 'youtube') {
@@ -344,6 +369,9 @@ class MultiPlatformDownloader {
    */
   isValidUrl(url) {
     try {
+      if (!url || typeof url !== 'string') {
+        return false;
+      }
       new URL(url);
       return true;
     } catch {

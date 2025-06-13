@@ -29,7 +29,8 @@ async function addMusicToVideo(videoPath, outputPath, category = "anime") {
       return new Promise((resolve, reject) => {
         ffmpeg(videoPath)
           .videoCodec('copy')
-          .audioCodec('copy')
+          .audioCodec('aac')
+          .audioBitrate('128k')
           .on('end', () => {
             console.log(chalk.green(`✅ Video processed (no music added): ${outputPath}`));
             resolve(outputPath);
@@ -45,18 +46,18 @@ async function addMusicToVideo(videoPath, outputPath, category = "anime") {
     console.log(chalk.blue(`🎶 Using music: ${path.basename(musicPath)}`));
     
     return new Promise((resolve, reject) => {
+      // Simple approach: replace audio with music
       ffmpeg()
         .addInput(videoPath)
         .addInput(musicPath)
         .outputOptions([
           '-shortest',           // End when shortest input ends
-          '-map 0:v:0',         // Map video from first input
-          '-map 1:a:0',         // Map audio from second input (music)
-          '-c:v copy',          // Copy video codec (no re-encoding)
-          '-c:a aac',           // Use AAC audio codec
-          '-b:a 128k',          // Audio bitrate
-          '-filter_complex', '[1:a]volume=0.3[music];[music]apad[musicpad];[musicpad][0:a]amix=inputs=2:duration=shortest[audio]',
-          '-map [audio]'        // Use mixed audio
+          '-map', '0:v:0',      // Map video from first input
+          '-map', '1:a:0',      // Map audio from second input (music)
+          '-c:v', 'copy',       // Copy video codec (no re-encoding)
+          '-c:a', 'aac',        // Use AAC audio codec
+          '-b:a', '128k',       // Audio bitrate
+          '-y'                  // Overwrite output file
         ])
         .on('start', (commandLine) => {
           console.log(chalk.gray(`🔧 FFmpeg command: ${commandLine}`));
@@ -77,7 +78,8 @@ async function addMusicToVideo(videoPath, outputPath, category = "anime") {
           console.log(chalk.yellow('🔄 Falling back to original video...'));
           ffmpeg(videoPath)
             .videoCodec('copy')
-            .audioCodec('copy')
+            .audioCodec('aac')
+            .audioBitrate('128k')
             .on('end', () => {
               console.log(chalk.green(`✅ Fallback completed: ${outputPath}`));
               resolve(outputPath);

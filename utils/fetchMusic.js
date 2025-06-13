@@ -44,7 +44,14 @@ async function fetchMusic(category = 'anime') {
     const musicDir = path.join(__dirname, '../assets/music');
     fs.ensureDirSync(musicDir);
     
-    // Get search terms for category
+    // First, try to use existing music
+    const existingMusic = getRandomExistingMusic();
+    if (existingMusic) {
+      console.log(chalk.green(`🎵 Using existing music: ${path.basename(existingMusic)}`));
+      return existingMusic;
+    }
+    
+    // If no existing music, try to download new one
     const searchTerms = musicCategories[category] || musicCategories.general;
     const randomTerm = searchTerms[Math.floor(Math.random() * searchTerms.length)];
     
@@ -78,35 +85,40 @@ async function fetchMusic(category = 'anime') {
     console.log(chalk.yellow(`⬇️ Downloading music: ${selectedMusic.title}`));
     console.log(chalk.gray(`📁 Duration: ${selectedMusic.duration.timestamp}`));
     
-    // Download audio using ytdl-core
-    const stream = ytdl(selectedMusic.url, { 
-      filter: 'audioonly',
-      quality: 'highestaudio'
-    });
-    
-    // Save to file
-    await new Promise((resolve, reject) => {
-      const writeStream = fs.createWriteStream(outputPath);
-      
-      stream.pipe(writeStream);
-      
-      stream.on('error', (err) => {
-        console.error(chalk.red(`❌ Stream error: ${err.message}`));
-        reject(err);
+    try {
+      // Download audio using ytdl-core
+      const stream = ytdl(selectedMusic.url, { 
+        filter: 'audioonly',
+        quality: 'highestaudio'
       });
       
-      writeStream.on('finish', () => {
-        console.log(chalk.green(`✅ Music downloaded: ${selectedMusic.title}`));
-        resolve();
+      // Save to file
+      await new Promise((resolve, reject) => {
+        const writeStream = fs.createWriteStream(outputPath);
+        
+        stream.pipe(writeStream);
+        
+        stream.on('error', (err) => {
+          console.error(chalk.red(`❌ Stream error: ${err.message}`));
+          reject(err);
+        });
+        
+        writeStream.on('finish', () => {
+          console.log(chalk.green(`✅ Music downloaded: ${selectedMusic.title}`));
+          resolve();
+        });
+        
+        writeStream.on('error', (err) => {
+          console.error(chalk.red(`❌ Write error: ${err.message}`));
+          reject(err);
+        });
       });
       
-      writeStream.on('error', (err) => {
-        console.error(chalk.red(`❌ Write error: ${err.message}`));
-        reject(err);
-      });
-    });
-    
-    return outputPath;
+      return outputPath;
+    } catch (downloadErr) {
+      console.error(chalk.red(`❌ Failed to download music: ${downloadErr.message}`));
+      return await useFallbackMusic(category);
+    }
     
   } catch (err) {
     console.error(chalk.red(`❌ Error fetching music: ${err.message}`));
@@ -135,7 +147,7 @@ async function useFallbackMusic(category) {
       }
     }
     
-    // If no existing music, create a silent audio file
+    // If no existing music, return null (video will use original audio)
     console.log(chalk.yellow('⚠️ No music available, video will use original audio'));
     return null;
     

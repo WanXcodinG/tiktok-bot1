@@ -59,9 +59,9 @@ async function generateCaption(topic) {
   }
   
   try {
-    // Initialize Gemini AI
+    // Initialize Gemini AI with updated model
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Updated model
     
     const prompt = `Create a catchy TikTok caption for a video about: "${topic}". 
     Requirements:

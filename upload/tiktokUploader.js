@@ -113,7 +113,7 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
 
     // Wait for video to process
     console.log("⏳ Waiting for video to process...");
-    await wait(5000);
+    await wait(8000); // Increased wait time for processing
 
     // ✍️ Add the caption
     try {
@@ -125,7 +125,8 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
         "div[data-text='true']",
         "textarea[placeholder*='caption']",
         "div[role='textbox']",
-        "[data-e2e='editor']"
+        "[data-e2e='editor']",
+        ".public-DraftEditor-content"
       ];
 
       let captionInput = null;
@@ -160,39 +161,37 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
       console.warn("⚠️ Could not add caption:", err.message);
     }
 
-    await wait(2000);
+    await wait(3000);
 
-    // 🚀 Click Post button using multiple strategies
+    // 🚀 Click Post button using the specific selector you provided
     try {
       console.log("🚀 Looking for Post button...");
       let posted = false;
       
-      // Strategy 1: Try data-e2e attribute
+      // Strategy 1: Use the exact selector you provided
       try {
-        const publishButton = await page.$('button[data-e2e="publish-button"]');
-        if (publishButton) {
-          await publishButton.click();
-          console.log("🚀 Posted to TikTok! (Strategy 1: data-e2e)");
+        const specificSelector = "#root > div > div > div.css-fsbw52.ep9i2zp0 > div.css-86gjln.edss2sz5 > div > div > div > div.jsx-3335848873.footer > div > button.Button__root.Button__root--shape-default.Button__root--size-large.Button__root--type-primary.Button__root--loading-false > div.Button__content.Button__content--shape-default.Button__content--size-large.Button__content--type-primary.Button__content--loading-false";
+        
+        console.log("🎯 Trying specific selector...");
+        await page.waitForSelector(specificSelector, { timeout: 10000 });
+        const specificButton = await page.$(specificSelector);
+        
+        if (specificButton) {
+          await specificButton.click();
+          console.log("🚀 Posted to TikTok! (Strategy 1: Specific selector)");
           posted = true;
         }
       } catch (e) {
-        console.log("Strategy 1 failed, trying strategy 2...");
+        console.log("Specific selector failed, trying alternative strategies...");
       }
       
-      // Strategy 2: Search by text content
+      // Strategy 2: Try data-e2e attribute
       if (!posted) {
         try {
-          const postButton = await page.evaluateHandle(() => {
-            const buttons = Array.from(document.querySelectorAll('button'));
-            return buttons.find(btn => {
-              const text = btn.textContent.toLowerCase();
-              return text.includes('post') || text.includes('publish') || text.includes('share');
-            });
-          });
-          
-          if (postButton && postButton.asElement) {
-            await postButton.asElement().click();
-            console.log("🚀 Posted to TikTok! (Strategy 2: text search)");
+          const publishButton = await page.$('button[data-e2e="publish-button"]');
+          if (publishButton) {
+            await publishButton.click();
+            console.log("🚀 Posted to TikTok! (Strategy 2: data-e2e)");
             posted = true;
           }
         } catch (e) {
@@ -200,13 +199,49 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
         }
       }
       
-      // Strategy 3: Try common button selectors
+      // Strategy 3: Search by button classes and text content
+      if (!posted) {
+        try {
+          const postButton = await page.evaluateHandle(() => {
+            // Look for buttons with specific classes
+            const buttons = Array.from(document.querySelectorAll('button'));
+            
+            // First try to find button with specific classes
+            let targetButton = buttons.find(btn => {
+              const classes = btn.className;
+              return classes.includes('Button__root--type-primary') && 
+                     classes.includes('Button__root--size-large');
+            });
+            
+            // If not found, search by text content
+            if (!targetButton) {
+              targetButton = buttons.find(btn => {
+                const text = btn.textContent.toLowerCase();
+                return text.includes('post') || text.includes('publish') || text.includes('share');
+              });
+            }
+            
+            return targetButton;
+          });
+          
+          if (postButton && postButton.asElement) {
+            await postButton.asElement().click();
+            console.log("🚀 Posted to TikTok! (Strategy 3: class + text search)");
+            posted = true;
+          }
+        } catch (e) {
+          console.log("Strategy 3 failed, trying strategy 4...");
+        }
+      }
+      
+      // Strategy 4: Try common button selectors
       if (!posted) {
         const buttonSelectors = [
           'button[type="submit"]',
           'div[role="button"]',
           '.btn-post',
-          '.publish-btn'
+          '.publish-btn',
+          'button.Button__root--type-primary'
         ];
         
         for (const selector of buttonSelectors) {
@@ -216,7 +251,7 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
               const text = await page.evaluate(el => el.textContent, element);
               if (text && (text.toLowerCase().includes('post') || text.toLowerCase().includes('publish'))) {
                 await element.click();
-                console.log(`🚀 Posted to TikTok! (Strategy 3: ${selector})`);
+                console.log(`🚀 Posted to TikTok! (Strategy 4: ${selector})`);
                 posted = true;
                 break;
               }
@@ -232,6 +267,10 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
         console.log("📝 Video uploaded and caption added. Please click 'Post' manually.");
         console.log("🔍 The browser will stay open for 30 seconds for manual posting...");
         await wait(30000);
+      } else {
+        // Wait a bit after posting
+        console.log("⏳ Waiting for post to complete...");
+        await wait(5000);
       }
       
     } catch (err) {
@@ -239,10 +278,6 @@ async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
       console.log("📝 Video uploaded but may need manual posting");
     }
 
-    // Final wait before closing
-    console.log("⏳ Finalizing upload...");
-    await wait(5000);
-    
     console.log("✅ TikTok upload process completed!");
     
   } catch (err) {

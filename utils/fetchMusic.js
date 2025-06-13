@@ -4,35 +4,63 @@ const fs = require('fs-extra');
 const path = require('path');
 const chalk = require('chalk');
 
-// Predefined music categories with specific search terms
+// Enhanced music categories with more specific search terms
 const musicCategories = {
   anime: [
-    'anime background music no copyright',
-    'japanese instrumental music',
-    'anime OST instrumental',
-    'epic anime music',
-    'anime phonk music'
+    'anime phonk music no copyright',
+    'anime AMV background music',
+    'japanese instrumental epic',
+    'anime fight scene music',
+    'phonk anime edit music',
+    'epic anime OST instrumental'
   ],
   tech: [
     'tech background music no copyright',
-    'electronic music instrumental',
-    'cyberpunk music',
-    'futuristic background music',
-    'tech house music'
+    'cyberpunk electronic music',
+    'futuristic synthwave music',
+    'tech house instrumental',
+    'AI technology background music',
+    'electronic tech music'
   ],
   horror: [
     'horror background music no copyright',
-    'dark ambient music',
-    'scary music instrumental',
+    'dark ambient horror music',
+    'scary instrumental music',
     'creepy background music',
-    'horror movie music'
+    'horror movie soundtrack',
+    'dark atmospheric music'
+  ],
+  chill: [
+    'chill lo-fi background music',
+    'relaxing instrumental music',
+    'calm ambient music',
+    'peaceful background music',
+    'soft instrumental music',
+    'meditation background music'
+  ],
+  energetic: [
+    'upbeat background music no copyright',
+    'energetic electronic music',
+    'motivational background music',
+    'dance electronic music',
+    'workout background music',
+    'high energy instrumental'
+  ],
+  cinematic: [
+    'cinematic background music',
+    'epic orchestral music',
+    'dramatic instrumental music',
+    'movie soundtrack music',
+    'epic cinematic music',
+    'orchestral background music'
   ],
   general: [
     'background music no copyright',
     'royalty free music',
-    'instrumental music',
+    'instrumental music trending',
     'upbeat background music',
-    'trending background music'
+    'popular instrumental music',
+    'viral background music'
   ]
 };
 
@@ -44,10 +72,10 @@ async function fetchMusic(category = 'anime') {
     const musicDir = path.join(__dirname, '../assets/music');
     fs.ensureDirSync(musicDir);
     
-    // First, try to use existing music
-    const existingMusic = getRandomExistingMusic();
+    // First, try to use existing music of the same category
+    const existingMusic = getRandomExistingMusic(category);
     if (existingMusic) {
-      console.log(chalk.green(`🎵 Using existing music: ${path.basename(existingMusic)}`));
+      console.log(chalk.green(`🎵 Using existing ${category} music: ${path.basename(existingMusic)}`));
       return existingMusic;
     }
     
@@ -60,10 +88,18 @@ async function fetchMusic(category = 'anime') {
     // Search for music videos
     const searchResults = await yts(randomTerm);
     
-    // Filter for shorter videos (background music is usually shorter)
+    // Filter for suitable music videos
     const musicVideos = searchResults.videos.filter(video => {
       const duration = video.duration?.seconds || 0;
-      return duration > 30 && duration < 300; // Between 30 seconds and 5 minutes
+      const title = video.title.toLowerCase();
+      
+      // Filter criteria
+      const isGoodDuration = duration > 30 && duration < 600; // 30 seconds to 10 minutes
+      const hasGoodKeywords = title.includes('music') || title.includes('instrumental') || 
+                             title.includes('background') || title.includes('no copyright');
+      const notLivestream = !title.includes('live') && !title.includes('stream');
+      
+      return isGoodDuration && hasGoodKeywords && notLivestream;
     });
     
     if (!musicVideos || musicVideos.length === 0) {
@@ -71,10 +107,10 @@ async function fetchMusic(category = 'anime') {
       return await useFallbackMusic(category);
     }
     
-    // Select a random music video
-    const selectedMusic = musicVideos[Math.floor(Math.random() * Math.min(musicVideos.length, 3))];
+    // Select a random music video from top results
+    const selectedMusic = musicVideos[Math.floor(Math.random() * Math.min(musicVideos.length, 5))];
     const musicId = selectedMusic.videoId;
-    const outputPath = path.join(musicDir, `${musicId}.mp3`);
+    const outputPath = path.join(musicDir, `${category}_${musicId}.mp3`);
     
     // Check if already downloaded
     if (fs.existsSync(outputPath)) {
@@ -82,7 +118,7 @@ async function fetchMusic(category = 'anime') {
       return outputPath;
     }
     
-    console.log(chalk.yellow(`⬇️ Downloading music: ${selectedMusic.title}`));
+    console.log(chalk.yellow(`⬇️ Downloading ${category} music: ${selectedMusic.title}`));
     console.log(chalk.gray(`📁 Duration: ${selectedMusic.duration.timestamp}`));
     
     try {
@@ -104,7 +140,7 @@ async function fetchMusic(category = 'anime') {
         });
         
         writeStream.on('finish', () => {
-          console.log(chalk.green(`✅ Music downloaded: ${selectedMusic.title}`));
+          console.log(chalk.green(`✅ ${category} music downloaded: ${selectedMusic.title}`));
           resolve();
         });
         
@@ -140,6 +176,19 @@ async function useFallbackMusic(category) {
       );
       
       if (musicFiles.length > 0) {
+        // Try to find music of the same category first
+        const categoryMusic = musicFiles.filter(file => 
+          file.toLowerCase().includes(category.toLowerCase())
+        );
+        
+        if (categoryMusic.length > 0) {
+          const randomMusic = categoryMusic[Math.floor(Math.random() * categoryMusic.length)];
+          const musicPath = path.join(musicDir, randomMusic);
+          console.log(chalk.green(`🎵 Using existing ${category} music: ${randomMusic}`));
+          return musicPath;
+        }
+        
+        // If no category-specific music, use any available music
         const randomMusic = musicFiles[Math.floor(Math.random() * musicFiles.length)];
         const musicPath = path.join(musicDir, randomMusic);
         console.log(chalk.green(`🎵 Using existing music: ${randomMusic}`));
@@ -158,9 +207,9 @@ async function useFallbackMusic(category) {
 }
 
 /**
- * Get random music from existing files
+ * Get random music from existing files, preferring category match
  */
-function getRandomExistingMusic() {
+function getRandomExistingMusic(category = 'anime') {
   try {
     const musicDir = path.join(__dirname, '../assets/music');
     
@@ -176,6 +225,17 @@ function getRandomExistingMusic() {
       return null;
     }
     
+    // Try to find music of the same category first
+    const categoryMusic = musicFiles.filter(file => 
+      file.toLowerCase().includes(category.toLowerCase())
+    );
+    
+    if (categoryMusic.length > 0) {
+      const randomMusic = categoryMusic[Math.floor(Math.random() * categoryMusic.length)];
+      return path.join(musicDir, randomMusic);
+    }
+    
+    // If no category-specific music, use any available music
     const randomMusic = musicFiles[Math.floor(Math.random() * musicFiles.length)];
     return path.join(musicDir, randomMusic);
     

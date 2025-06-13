@@ -1,4 +1,5 @@
 const MultiPlatformDownloader = require('./multiPlatformDownloader');
+const RandomSearchGenerator = require('../utils/randomSearchGenerator');
 const chalk = require('chalk');
 
 /**
@@ -65,37 +66,33 @@ async function getMultiPlatformVideos(sources, options = {}) {
 }
 
 /**
- * Get videos by category with mixed sources
+ * Get videos by category with random search terms - UPDATED
  */
 async function getVideosByCategory(category, count = 1) {
+  const searchGenerator = new RandomSearchGenerator();
+  
   const categoryMappings = {
     'Anime Edited Videos': {
-      searchTerms: ['anime AMV edit', 'anime fight scenes', 'anime compilation'],
       platforms: ['YouTube'],
       hashtags: 'anime edit, fight scenes, Japanese animation'
     },
     'Tech Shorts': {
-      searchTerms: ['tech review', 'AI technology', 'gadget unboxing'],
       platforms: ['YouTube'],
       hashtags: 'tech, ai, gadgets, programming'
     },
     'Horror Clips': {
-      searchTerms: ['horror short film', 'scary videos', 'creepy stories'],
       platforms: ['YouTube'],
       hashtags: 'horror, scary, thriller, creepy'
     },
     'Made-Up TikTok Movies': {
-      searchTerms: ['short film phone', 'TikTok movie', 'vertical cinema'],
       platforms: ['YouTube', 'TikTok'],
       hashtags: 'shortfilm, storytime, acting, movie'
     },
     'TikTok Viral': {
-      searchTerms: ['viral TikTok', 'trending TikTok'],
       platforms: ['TikTok'],
       hashtags: 'viral, trending, tiktok, fyp'
     },
     'Instagram Reels': {
-      searchTerms: ['Instagram reels', 'viral reels'],
       platforms: ['Instagram'],
       hashtags: 'reels, instagram, viral, trending'
     }
@@ -106,13 +103,15 @@ async function getVideosByCategory(category, count = 1) {
     throw new Error(`Category "${category}" not supported`);
   }
 
-  console.log(chalk.cyan(`🎯 Fetching ${category} videos...`));
-
-  // Use search terms to find videos
-  const searchTerm = config.searchTerms[Math.floor(Math.random() * config.searchTerms.length)];
-  const platform = config.platforms[0]; // Use first platform as default
+  console.log(chalk.cyan(`🎯 Fetching ${category} videos with random search...`));
 
   try {
+    // Generate random search term using AI or fallback
+    const searchTerm = await searchGenerator.generateRandomSearch(category);
+    const platform = config.platforms[0]; // Use first platform as default
+
+    console.log(chalk.magenta(`🎲 Random search term: "${searchTerm}"`));
+
     const results = await getMultiPlatformVideos(searchTerm, {
       platform: platform,
       limit: count,
@@ -124,7 +123,8 @@ async function getVideosByCategory(category, count = 1) {
       ...result,
       category: category,
       hashtags: config.hashtags,
-      videoId: result.id
+      videoId: result.id,
+      searchTerm: searchTerm // Add search term for reference
     }));
 
   } catch (err) {

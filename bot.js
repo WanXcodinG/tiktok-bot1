@@ -11,6 +11,7 @@ cron.schedule("0 3 * * *", cleanup); // 🕒 runs daily at 3:00 AM
 async function main() {
   console.log(chalk.blueBright("📱 TikTok Multi-Platform Content Bot"));
   console.log(chalk.gray("Supports: YouTube, TikTok, Instagram, Facebook, Twitter"));
+  console.log(chalk.magenta("🎲 Now with Random Search & Smart Audio Detection!"));
 
   const { inputType } = await inquirer.prompt([
     {
@@ -18,7 +19,7 @@ async function main() {
       name: "inputType",
       message: "How do you want to get videos?",
       choices: [
-        "📂 Choose from categories",
+        "📂 Choose from categories (Random Search)",
         "🔗 Provide direct URLs",
         "🔍 Search by keyword"
       ],
@@ -29,7 +30,7 @@ async function main() {
   let category = "";
   let hashtags = "";
 
-  if (inputType === "📂 Choose from categories") {
+  if (inputType === "📂 Choose from categories (Random Search)") {
     const { selectedCategory } = await inquirer.prompt([
       {
         type: "list",
@@ -48,6 +49,7 @@ async function main() {
 
     category = selectedCategory;
     console.log(chalk.green(`> You selected: ${category}`));
+    console.log(chalk.cyan(`🎲 Using random search with AI-powered audio detection!`));
 
     try {
       results = await getVideosByCategory(category, 1);
@@ -188,6 +190,10 @@ async function main() {
   console.log(chalk.cyan(`🎬 Processing: ${video.title}`));
   console.log(chalk.gray(`📱 Platform: ${video.platform}`));
   console.log(chalk.gray(`📁 File: ${video.localPath}`));
+  
+  if (video.searchTerm) {
+    console.log(chalk.magenta(`🎲 Random search used: "${video.searchTerm}"`));
+  }
 
   // Import processing modules
   const generateCaption = require("./utils/generateCaption");
@@ -203,11 +209,18 @@ async function main() {
     console.log(chalk.yellow("🎬 Editing video..."));
     await editAnimeVideo(rawPath, editedPath);
 
-    console.log(chalk.yellow("🎵 Adding music..."));
+    console.log(chalk.yellow("🎵 Adding smart audio detection..."));
     const musicCategory = category.toLowerCase().includes('anime') ? 'anime' : 
                          category.toLowerCase().includes('tech') ? 'tech' :
                          category.toLowerCase().includes('horror') ? 'horror' : 'anime';
-    await addMusicToVideo(editedPath, finalPath, musicCategory);
+    
+    // Pass video info for better audio detection
+    await addMusicToVideo(editedPath, finalPath, musicCategory, {
+      title: video.title,
+      description: video.description || '',
+      platform: video.platform,
+      category: category
+    });
 
     console.log(chalk.yellow("📝 Generating caption..."));
     const caption = await generateCaption(hashtags);
@@ -220,6 +233,9 @@ async function main() {
     console.log(chalk.gray(`   Title: ${video.title}`));
     console.log(chalk.gray(`   Platform: ${video.platform}`));
     console.log(chalk.gray(`   Category: ${category}`));
+    if (video.searchTerm) {
+      console.log(chalk.gray(`   Search Term: ${video.searchTerm}`));
+    }
     console.log(chalk.gray(`   Caption: ${caption}`));
 
   } catch (err) {

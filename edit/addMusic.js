@@ -1,25 +1,63 @@
 const fetchMusic = require("../utils/fetchMusic");
+const AudioDetector = require("../utils/audioDetector");
 const ffmpeg = require("fluent-ffmpeg");
 const chalk = require("chalk");
 const path = require("path");
 const fs = require("fs");
 
-async function addMusicToVideo(videoPath, outputPath, category = "anime") {
+async function addMusicToVideo(videoPath, outputPath, category = "anime", videoInfo = {}) {
   try {
-    console.log(chalk.cyan(`🎵 Adding ${category} music to video...`));
+    console.log(chalk.cyan(`🎵 Adding music to video with smart detection...`));
     
     // Check if video file exists
     if (!fs.existsSync(videoPath)) {
       throw new Error(`Video file not found: ${videoPath}`);
     }
     
-    // Try to get music
+    // Initialize audio detector
+    const audioDetector = new AudioDetector();
+    
+    // Detect appropriate audio category based on video content
+    let detectedCategory = category;
+    try {
+      console.log(chalk.yellow('🔍 Analyzing video content for audio matching...'));
+      detectedCategory = await audioDetector.detectAudioCategory(
+        videoPath, 
+        videoInfo.title || '', 
+        videoInfo.description || ''
+      );
+      
+      console.log(chalk.green(`🎯 Detected audio category: ${detectedCategory}`));
+      
+      // Get audio recommendations
+      const recommendations = audioDetector.getAudioRecommendations(detectedCategory);
+      console.log(chalk.blue(`🎼 Audio mood: ${recommendations.mood}`));
+      console.log(chalk.gray(`🎵 Genres: ${recommendations.genres.join(', ')}`));
+      
+    } catch (err) {
+      console.log(chalk.yellow(`⚠️ Audio detection failed, using default: ${err.message}`));
+      detectedCategory = category;
+    }
+    
+    // Try to get music based on detected category
     let musicPath;
     try {
-      musicPath = await fetchMusic(category);
+      musicPath = await fetchMusic(detectedCategory);
     } catch (err) {
-      console.log(chalk.yellow(`⚠️ Failed to fetch new music: ${err.message}`));
-      musicPath = null;
+      console.log(chalk.yellow(`⚠️ Failed to fetch ${detectedCategory} music: ${err.message}`));
+      
+      // Try fallback with original category
+      if (detectedCategory !== category) {
+        try {
+          console.log(chalk.blue(`🔄 Trying fallback category: ${category}`));
+          musicPath = await fetchMusic(category);
+        } catch (fallbackErr) {
+          console.log(chalk.yellow(`⚠️ Fallback music also failed: ${fallbackErr.message}`));
+          musicPath = null;
+        }
+      } else {
+        musicPath = null;
+      }
     }
     
     // If no music available, just copy the video
@@ -43,10 +81,10 @@ async function addMusicToVideo(videoPath, outputPath, category = "anime") {
       });
     }
     
-    console.log(chalk.blue(`🎶 Using music: ${path.basename(musicPath)}`));
+    console.log(chalk.blue(`🎶 Using ${detectedCategory} music: ${path.basename(musicPath)}`));
     
     return new Promise((resolve, reject) => {
-      // Simple approach: replace audio with music
+      // Enhanced audio mixing approach
       ffmpeg()
         .addInput(videoPath)
         .addInput(musicPath)
@@ -57,6 +95,7 @@ async function addMusicToVideo(videoPath, outputPath, category = "anime") {
           '-c:v', 'copy',       // Copy video codec (no re-encoding)
           '-c:a', 'aac',        // Use AAC audio codec
           '-b:a', '128k',       // Audio bitrate
+          '-af', 'volume=0.7',  // Reduce music volume slightly
           '-y'                  // Overwrite output file
         ])
         .on('start', (commandLine) => {
@@ -64,11 +103,11 @@ async function addMusicToVideo(videoPath, outputPath, category = "anime") {
         })
         .on('progress', (progress) => {
           if (progress.percent) {
-            console.log(chalk.blue(`🎵 Adding music: ${progress.percent.toFixed(1)}%`));
+            console.log(chalk.blue(`🎵 Adding ${detectedCategory} music: ${progress.percent.toFixed(1)}%`));
           }
         })
         .on('end', () => {
-          console.log(chalk.green(`✅ Music added successfully: ${outputPath}`));
+          console.log(chalk.green(`✅ ${detectedCategory} music added successfully: ${outputPath}`));
           resolve(outputPath);
         })
         .on('error', (err) => {

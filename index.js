@@ -12,7 +12,7 @@ async function main() {
       message: "What do you want to do?",
       choices: [
         "🎬 Process videos now (Interactive)",
-        "⏰ Setup scheduled posting",
+        "⏰ Setup cleanup schedules",
         "🧹 Cleanup files only",
         "❌ Exit"
       ],
@@ -27,8 +27,8 @@ async function main() {
         await bot();
         break;
         
-      case "⏰ Setup scheduled posting":
-        console.log(chalk.cyan("Starting scheduler setup..."));
+      case "⏰ Setup cleanup schedules":
+        console.log(chalk.cyan("Starting cleanup scheduler setup..."));
         const scheduler = require("./scheduler");
         await scheduler();
         break;

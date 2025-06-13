@@ -12,6 +12,8 @@ class MultiPlatformDownloader {
       'youtube.com': 'YouTube',
       'youtu.be': 'YouTube',
       'tiktok.com': 'TikTok',
+      'vm.tiktok.com': 'TikTok',
+      'vt.tiktok.com': 'TikTok',
       'instagram.com': 'Instagram',
       'facebook.com': 'Facebook',
       'fb.watch': 'Facebook',
@@ -32,7 +34,7 @@ class MultiPlatformDownloader {
       const hostname = urlObj.hostname.replace('www.', '').replace('m.', '');
       
       for (const [domain, platform] of Object.entries(this.supportedPlatforms)) {
-        if (hostname.includes(domain.replace('.com', ''))) {
+        if (hostname.includes(domain.replace('.com', '')) || hostname === domain) {
           return platform;
         }
       }
@@ -63,7 +65,17 @@ class MultiPlatformDownloader {
       };
     } catch (err) {
       console.error(chalk.red(`❌ Failed to get video info: ${err.message}`));
-      throw err;
+      // Return basic info even if getVideoInfo fails
+      return {
+        id: this.generateId(),
+        title: 'Downloaded Video',
+        duration: 0,
+        uploader: 'Unknown',
+        platform: this.detectPlatform(url),
+        url: url,
+        thumbnail: null,
+        description: ''
+      };
     }
   }
 
@@ -75,42 +87,42 @@ class MultiPlatformDownloader {
       const platform = this.detectPlatform(url);
       console.log(chalk.cyan(`📥 Downloading from ${platform}...`));
       
-      // Get video info first
+      // Get video info first (with fallback)
       const videoInfo = await this.getVideoInfo(url);
       const videoId = videoInfo.id;
-      const outputPath = path.join(this.outputDir, `${videoId}.mp4`);
       
-      // Check if already downloaded
-      if (fs.existsSync(outputPath)) {
-        console.log(chalk.green(`✅ Video already exists: ${videoInfo.title}`));
-        return {
-          ...videoInfo,
-          localPath: outputPath,
-          alreadyExists: true
-        };
-      }
-
+      // Create output filename with platform prefix
+      const outputFilename = `${platform.toLowerCase()}_${videoId}.%(ext)s`;
+      const outputTemplate = path.join(this.outputDir, outputFilename);
+      
+      console.log(chalk.yellow(`⬇️ Downloading: ${videoInfo.title}`));
+      console.log(chalk.gray(`📁 Output template: ${outputTemplate}`));
+      
       // Download options based on platform
       const downloadOptions = this.getDownloadOptions(platform, options);
       
-      console.log(chalk.yellow(`⬇️ Downloading: ${videoInfo.title}`));
-      console.log(chalk.gray(`📁 Saving to: ${outputPath}`));
-      
-      // Download the video
-      await this.ytDlp.exec([
+      // Execute download
+      const command = [
         url,
-        '-o', outputPath,
+        '-o', outputTemplate,
         ...downloadOptions
-      ]);
-
-      // Verify download
-      if (fs.existsSync(outputPath)) {
-        const stats = fs.statSync(outputPath);
+      ];
+      
+      console.log(chalk.gray(`🔧 Command: yt-dlp ${command.join(' ')}`));
+      
+      await this.ytDlp.exec(command);
+      
+      // Find the downloaded file
+      const downloadedFile = await this.findDownloadedFile(videoId, platform);
+      
+      if (downloadedFile && fs.existsSync(downloadedFile)) {
+        const stats = fs.statSync(downloadedFile);
         console.log(chalk.green(`✅ Downloaded successfully! Size: ${(stats.size / 1024 / 1024).toFixed(2)}MB`));
+        console.log(chalk.green(`📁 File location: ${downloadedFile}`));
         
         return {
           ...videoInfo,
-          localPath: outputPath,
+          localPath: downloadedFile,
           fileSize: stats.size,
           alreadyExists: false
         };
@@ -125,25 +137,82 @@ class MultiPlatformDownloader {
   }
 
   /**
+   * Find downloaded file by searching for files with video ID
+   */
+  async findDownloadedFile(videoId, platform) {
+    try {
+      const files = fs.readdirSync(this.outputDir);
+      
+      // Look for files containing the video ID
+      const matchingFiles = files.filter(file => {
+        const lowerFile = file.toLowerCase();
+        const lowerVideoId = videoId.toLowerCase();
+        const lowerPlatform = platform.toLowerCase();
+        
+        return (lowerFile.includes(lowerVideoId) || 
+                lowerFile.includes(lowerPlatform)) &&
+               (lowerFile.endsWith('.mp4') || 
+                lowerFile.endsWith('.webm') || 
+                lowerFile.endsWith('.mkv'));
+      });
+      
+      if (matchingFiles.length > 0) {
+        // Return the most recent file
+        const sortedFiles = matchingFiles.map(file => ({
+          name: file,
+          path: path.join(this.outputDir, file),
+          stats: fs.statSync(path.join(this.outputDir, file))
+        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
+        
+        return sortedFiles[0].path;
+      }
+      
+      // If no matching files, return the most recent video file
+      const videoFiles = files.filter(file => 
+        file.endsWith('.mp4') || file.endsWith('.webm') || file.endsWith('.mkv')
+      );
+      
+      if (videoFiles.length > 0) {
+        const sortedFiles = videoFiles.map(file => ({
+          name: file,
+          path: path.join(this.outputDir, file),
+          stats: fs.statSync(path.join(this.outputDir, file))
+        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
+        
+        console.log(chalk.yellow(`⚠️ Using most recent video file: ${sortedFiles[0].name}`));
+        return sortedFiles[0].path;
+      }
+      
+      return null;
+    } catch (err) {
+      console.error(chalk.red(`❌ Error finding downloaded file: ${err.message}`));
+      return null;
+    }
+  }
+
+  /**
    * Get platform-specific download options
    */
   getDownloadOptions(platform, userOptions = {}) {
     const baseOptions = [
-      '--format', 'best[height<=1080]',
+      '--format', 'best[height<=1080]/best',
       '--merge-output-format', 'mp4',
       '--no-playlist',
-      '--no-warnings'
+      '--no-warnings',
+      '--ignore-errors',
+      '--no-check-certificate'
     ];
 
     const platformOptions = {
       'YouTube': [
-        '--format', 'best[ext=mp4][height<=1080]',
+        '--format', 'best[ext=mp4][height<=1080]/best[ext=mp4]/best',
         '--embed-subs',
         '--write-auto-sub'
       ],
       'TikTok': [
         '--format', 'best',
-        '--no-check-certificate'
+        '--no-check-certificate',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       ],
       'Instagram': [
         '--format', 'best',
@@ -159,15 +228,18 @@ class MultiPlatformDownloader {
       ]
     };
 
-    const options = [...baseOptions];
+    let options = [...baseOptions];
     
     if (platformOptions[platform]) {
+      // Replace base format option with platform-specific one
+      options = options.filter(opt => opt !== 'best[height<=1080]/best');
       options.push(...platformOptions[platform]);
     }
 
     // Add user-specified options
     if (userOptions.quality) {
-      options.push('--format', `best[height<=${userOptions.quality}]`);
+      options = options.filter(opt => !opt.includes('height<='));
+      options.push('--format', `best[height<=${userOptions.quality}]/best`);
     }
     
     if (userOptions.audioOnly) {
@@ -192,7 +264,8 @@ class MultiPlatformDownloader {
         
         // Add delay between downloads to be respectful
         if (urls.length > 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          console.log(chalk.gray('⏳ Waiting 3 seconds before next download...'));
+          await new Promise(resolve => setTimeout(resolve, 3000));
         }
       } catch (err) {
         console.error(chalk.red(`❌ Failed to download ${url}: ${err.message}`));

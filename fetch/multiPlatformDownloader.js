@@ -88,7 +88,7 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Download video from any supported platform - ENHANCED FILE DETECTION V2
+   * Download video from any supported platform - SIMPLIFIED & FIXED
    */
   async downloadVideo(url, options = {}) {
     try {
@@ -103,13 +103,12 @@ class MultiPlatformDownloader {
       const videoInfo = await this.getVideoInfo(url);
       const videoId = videoInfo.id;
       
-      // Get DETAILED list of files BEFORE download with timestamps
-      const filesBefore = this.getDetailedVideoFiles();
+      // SIMPLIFIED: Just count files before and after
+      const filesBefore = this.getVideoFileNames();
       console.log(chalk.gray(`📁 Files before download: ${filesBefore.length}`));
       
-      // Create unique filename with timestamp to avoid conflicts
-      const timestamp = Date.now();
-      const outputFilename = `${platform.toLowerCase()}_${videoId}_${timestamp}.%(ext)s`;
+      // Create simple filename without timestamp complications
+      const outputFilename = `${platform.toLowerCase()}_${videoId}.%(ext)s`;
       const outputTemplate = path.join(this.outputDir, outputFilename);
       
       console.log(chalk.yellow(`⬇️ Downloading: ${videoInfo.title}`));
@@ -137,67 +136,77 @@ class MultiPlatformDownloader {
         throw new Error(`Download failed: ${ytDlpError.message}`);
       }
       
-      // Wait a moment for file system to update
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for file system to update
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Get DETAILED list of files AFTER download with timestamps
-      const filesAfter = this.getDetailedVideoFiles();
+      // SIMPLIFIED: Get files after download
+      const filesAfter = this.getVideoFileNames();
       console.log(chalk.gray(`📁 Files after download: ${filesAfter.length}`));
       
-      // Find the newly downloaded file using multiple strategies
+      // Find the new file - MUCH SIMPLER APPROACH
       let downloadedFile = null;
       
-      // Strategy 1: Find files that appeared after download (most reliable)
-      const newFiles = filesAfter.filter(fileAfter => {
-        return !filesBefore.some(fileBefore => 
-          fileBefore.name === fileAfter.name && 
-          Math.abs(fileBefore.mtime - fileAfter.mtime) < 5000 // Within 5 seconds
-        );
-      });
+      // Strategy 1: Look for exact filename match
+      const expectedFilename = `${platform.toLowerCase()}_${videoId}.mp4`;
+      const expectedPath = path.join(this.outputDir, expectedFilename);
       
-      if (newFiles.length > 0) {
-        // Use the newest file from the new files
-        const newestFile = newFiles.reduce((newest, current) => {
-          return current.mtime > newest.mtime ? current : newest;
-        });
-        
-        downloadedFile = newestFile.path;
-        console.log(chalk.green(`✅ Found new downloaded file: ${newestFile.name}`));
+      if (fs.existsSync(expectedPath)) {
+        downloadedFile = expectedPath;
+        console.log(chalk.green(`✅ Found expected file: ${expectedFilename}`));
       } else {
-        // Strategy 2: Look for files with the exact timestamp pattern
-        const timestampMatches = filesAfter.filter(file => {
-          return file.name.includes(timestamp.toString()) && 
-                 file.name.includes(videoId);
-        });
+        // Strategy 2: Look for any file with the video ID
+        const matchingFiles = filesAfter.filter(file => 
+          file.toLowerCase().includes(videoId.toLowerCase())
+        );
         
-        if (timestampMatches.length > 0) {
-          downloadedFile = timestampMatches[0].path;
-          console.log(chalk.blue(`🔍 Found file with timestamp: ${timestampMatches[0].name}`));
-        } else {
-          // Strategy 3: Look for files with video ID that are very recent (last 2 minutes)
-          const recentTime = Date.now() - (2 * 60 * 1000); // 2 minutes ago
-          const recentMatches = filesAfter.filter(file => {
-            return file.name.toLowerCase().includes(videoId.toLowerCase()) &&
-                   file.mtime > recentTime;
-          });
+        if (matchingFiles.length > 0) {
+          // Use the first matching file
+          downloadedFile = path.join(this.outputDir, matchingFiles[0]);
+          console.log(chalk.blue(`🔍 Found matching file: ${matchingFiles[0]}`));
           
-          if (recentMatches.length > 0) {
-            // Use the most recent one
-            const mostRecent = recentMatches.reduce((newest, current) => {
-              return current.mtime > newest.mtime ? current : newest;
-            });
-            downloadedFile = mostRecent.path;
-            console.log(chalk.blue(`🔍 Found recent video ID match: ${mostRecent.name}`));
-          } else {
-            // Strategy 4: Look for ANY very recent file (absolute last resort)
-            const veryRecentFiles = filesAfter.filter(file => file.mtime > recentTime);
+          // Rename to expected format
+          try {
+            if (downloadedFile !== expectedPath) {
+              await fs.move(downloadedFile, expectedPath, { overwrite: true });
+              downloadedFile = expectedPath;
+              console.log(chalk.blue(`📝 Renamed to: ${expectedFilename}`));
+            }
+          } catch (renameErr) {
+            console.log(chalk.yellow(`⚠️ Could not rename: ${renameErr.message}`));
+          }
+        } else {
+          // Strategy 3: Look for new files (files that weren't there before)
+          const newFiles = filesAfter.filter(file => !filesBefore.includes(file));
+          
+          if (newFiles.length > 0) {
+            // Use the first new file
+            downloadedFile = path.join(this.outputDir, newFiles[0]);
+            console.log(chalk.blue(`🆕 Found new file: ${newFiles[0]}`));
             
-            if (veryRecentFiles.length > 0) {
-              const mostRecent = veryRecentFiles.reduce((newest, current) => {
-                return current.mtime > newest.mtime ? current : newest;
-              });
+            // Try to rename to expected format
+            try {
+              await fs.move(downloadedFile, expectedPath, { overwrite: true });
+              downloadedFile = expectedPath;
+              console.log(chalk.blue(`📝 Renamed to: ${expectedFilename}`));
+            } catch (renameErr) {
+              console.log(chalk.yellow(`⚠️ Could not rename: ${renameErr.message}`));
+            }
+          } else {
+            // Strategy 4: Use most recent file as last resort
+            const allFiles = this.getDetailedVideoFiles();
+            if (allFiles.length > 0) {
+              const mostRecent = allFiles[0]; // Already sorted by newest first
               downloadedFile = mostRecent.path;
               console.log(chalk.yellow(`⚠️ Using most recent file: ${mostRecent.name}`));
+              
+              // Try to rename to expected format
+              try {
+                await fs.move(downloadedFile, expectedPath, { overwrite: true });
+                downloadedFile = expectedPath;
+                console.log(chalk.blue(`📝 Renamed to: ${expectedFilename}`));
+              } catch (renameErr) {
+                console.log(chalk.yellow(`⚠️ Could not rename: ${renameErr.message}`));
+              }
             }
           }
         }
@@ -208,56 +217,18 @@ class MultiPlatformDownloader {
         console.log(chalk.green(`✅ Downloaded successfully! Size: ${(stats.size / 1024 / 1024).toFixed(2)}MB`));
         console.log(chalk.green(`📁 File location: ${downloadedFile}`));
         
-        // Create a consistent filename for easier reference
-        const finalFilename = `${platform.toLowerCase()}_${videoId}.mp4`;
-        const finalPath = path.join(this.outputDir, finalFilename);
-        
-        // Always rename to consistent format for easier processing
-        try {
-          if (downloadedFile !== finalPath) {
-            // Remove existing file with same name if it exists
-            if (fs.existsSync(finalPath)) {
-              console.log(chalk.yellow(`🗑️ Removing existing file: ${path.basename(finalPath)}`));
-              await fs.remove(finalPath);
-            }
-            
-            await fs.move(downloadedFile, finalPath, { overwrite: true });
-            console.log(chalk.blue(`📝 Renamed to: ${finalFilename}`));
-          }
-          
-          // Verify the final file exists
-          if (!fs.existsSync(finalPath)) {
-            throw new Error('File rename failed - final file not found');
-          }
-          
-          return {
-            ...videoInfo,
-            localPath: finalPath, // Always use the consistent final path
-            fileSize: stats.size,
-            alreadyExists: false,
-            actualVideoId: videoId,
-            originalDownloadPath: downloadedFile, // Keep track of original path
-            downloadTimestamp: timestamp // Add timestamp for tracking
-          };
-          
-        } catch (renameErr) {
-          console.log(chalk.yellow(`⚠️ Could not rename file: ${renameErr.message}`));
-          // If rename fails, use the original downloaded file path
-          return {
-            ...videoInfo,
-            localPath: downloadedFile,
-            fileSize: stats.size,
-            alreadyExists: false,
-            actualVideoId: videoId,
-            originalDownloadPath: downloadedFile,
-            downloadTimestamp: timestamp
-          };
-        }
+        return {
+          ...videoInfo,
+          localPath: downloadedFile,
+          fileSize: stats.size,
+          alreadyExists: false,
+          actualVideoId: videoId
+        };
       } else {
         // Enhanced error reporting
-        console.error(chalk.red(`❌ No matching files found for video ID: ${videoId}`));
+        console.error(chalk.red(`❌ No file found after download for video ID: ${videoId}`));
         
-        // Debug: List all files in directory with details
+        // Debug: List all files in directory
         const allFiles = this.getDetailedVideoFiles();
         console.log(chalk.gray(`📁 Available files after download:`));
         allFiles.forEach(file => {
@@ -275,46 +246,9 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Get all video files with detailed information (name, path, mtime, size)
+   * Get simple list of video file names
    */
-  getDetailedVideoFiles() {
-    try {
-      if (!fs.existsSync(this.outputDir)) {
-        return [];
-      }
-      
-      const files = fs.readdirSync(this.outputDir).filter(file => {
-        const lowerFile = file.toLowerCase();
-        return (lowerFile.endsWith('.mp4') || 
-                lowerFile.endsWith('.webm') || 
-                lowerFile.endsWith('.mkv') ||
-                lowerFile.endsWith('.avi') ||
-                lowerFile.endsWith('.mov')) &&
-               !lowerFile.endsWith('.part') && // Skip partial downloads
-               !lowerFile.includes('.tmp'); // Skip temp files
-      });
-      
-      return files.map(file => {
-        const filePath = path.join(this.outputDir, file);
-        const stats = fs.statSync(filePath);
-        return {
-          name: file,
-          path: filePath,
-          mtime: stats.mtime.getTime(),
-          size: stats.size
-        };
-      }).sort((a, b) => b.mtime - a.mtime); // Sort by newest first
-      
-    } catch (err) {
-      console.error(chalk.red(`❌ Error getting detailed video files: ${err.message}`));
-      return [];
-    }
-  }
-
-  /**
-   * Get all video files in the output directory (simple version)
-   */
-  getVideoFiles() {
+  getVideoFileNames() {
     try {
       if (!fs.existsSync(this.outputDir)) {
         return [];
@@ -331,7 +265,35 @@ class MultiPlatformDownloader {
                !lowerFile.includes('.tmp'); // Skip temp files
       });
     } catch (err) {
-      console.error(chalk.red(`❌ Error getting video files: ${err.message}`));
+      console.error(chalk.red(`❌ Error getting video file names: ${err.message}`));
+      return [];
+    }
+  }
+
+  /**
+   * Get all video files with detailed information (name, path, mtime, size)
+   */
+  getDetailedVideoFiles() {
+    try {
+      if (!fs.existsSync(this.outputDir)) {
+        return [];
+      }
+      
+      const files = this.getVideoFileNames();
+      
+      return files.map(file => {
+        const filePath = path.join(this.outputDir, file);
+        const stats = fs.statSync(filePath);
+        return {
+          name: file,
+          path: filePath,
+          mtime: stats.mtime.getTime(),
+          size: stats.size
+        };
+      }).sort((a, b) => b.mtime - a.mtime); // Sort by newest first
+      
+    } catch (err) {
+      console.error(chalk.red(`❌ Error getting detailed video files: ${err.message}`));
       return [];
     }
   }

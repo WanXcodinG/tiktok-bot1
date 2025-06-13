@@ -92,6 +92,64 @@ class VideoAnalyzer {
   }
 
   /**
+   * Clean and parse JSON response from AI - IMPROVED
+   */
+  parseAIResponse(rawResponse) {
+    try {
+      console.log(chalk.gray(`🔍 Parsing AI response (${rawResponse.length} chars)...`));
+      
+      let cleanedResponse = rawResponse.trim();
+      
+      // Remove markdown code blocks if present
+      if (cleanedResponse.includes('```json')) {
+        const jsonStart = cleanedResponse.indexOf('```json') + 7;
+        const jsonEnd = cleanedResponse.lastIndexOf('```');
+        if (jsonEnd > jsonStart) {
+          cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd).trim();
+        }
+      } else if (cleanedResponse.includes('```')) {
+        // Handle generic code blocks
+        const jsonStart = cleanedResponse.indexOf('```') + 3;
+        const jsonEnd = cleanedResponse.lastIndexOf('```');
+        if (jsonEnd > jsonStart) {
+          cleanedResponse = cleanedResponse.substring(jsonStart, jsonEnd).trim();
+        }
+      }
+      
+      // Remove any leading/trailing non-JSON content
+      const jsonStartIndex = cleanedResponse.indexOf('{');
+      const jsonEndIndex = cleanedResponse.lastIndexOf('}');
+      
+      if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+        cleanedResponse = cleanedResponse.substring(jsonStartIndex, jsonEndIndex + 1);
+      }
+      
+      // Try to parse the cleaned JSON
+      const parsed = JSON.parse(cleanedResponse);
+      
+      // Validate required fields
+      if (!parsed.title || !parsed.description || !parsed.tags) {
+        throw new Error('Missing required fields in AI response');
+      }
+      
+      // Clean and validate the fields
+      const metadata = {
+        title: String(parsed.title).substring(0, 60).trim(),
+        description: String(parsed.description).substring(0, 150).trim(),
+        tags: String(parsed.tags).trim()
+      };
+      
+      console.log(chalk.green('✅ AI response parsed successfully'));
+      return metadata;
+      
+    } catch (err) {
+      console.error(chalk.red(`❌ JSON parsing failed: ${err.message}`));
+      console.log(chalk.gray(`Raw response preview: ${rawResponse.substring(0, 200)}...`));
+      throw new Error('AI response parsing failed');
+    }
+  }
+
+  /**
    * Analyze multiple frames menggunakan Gemini Vision API
    */
   async analyzeVideoContent(videoPath, originalTitle = '', originalDescription = '') {
@@ -179,46 +237,35 @@ Based on your analysis of all frames, generate:
    - Add tags based on what you see in the frames
    - Include subject matter, style, mood tags
 
-Format your response as JSON:
+IMPORTANT: Return ONLY a valid JSON object with this exact structure:
 {
   "title": "Your catchy title based on video analysis",
   "description": "Your engaging description of the video content",
   "tags": "viral, fyp, trending, content-specific-tag1, content-specific-tag2, mood-tag"
 }
 
-Only return the JSON, nothing else.`;
+Do not include any markdown formatting, code blocks, or additional text. Only return the JSON object.`;
 
       // Create content array with prompt and all frames
       const content = [prompt, ...frameImages];
 
       const result = await model.generateContent(content);
       const response = await result.response;
-      const text = response.text().trim();
+      const text = response.text();
 
-      // Parse JSON response
-      try {
-        const metadata = JSON.parse(text);
-        
-        // Validate metadata
-        if (metadata.title && metadata.description && metadata.tags) {
-          console.log(chalk.green('✅ Multi-frame AI analysis completed successfully!'));
-          console.log(chalk.blue(`📝 Generated Title: ${metadata.title}`));
-          console.log(chalk.blue(`📄 Generated Description: ${metadata.description}`));
-          console.log(chalk.blue(`🏷️ Generated Tags: ${metadata.tags}`));
-          console.log(chalk.gray(`🎬 Analysis based on ${frameImages.length} frames`));
-          
-          // Cleanup frame files
-          await this.cleanupTempFiles();
-          
-          return metadata;
-        } else {
-          throw new Error('Invalid metadata structure');
-        }
-      } catch (parseErr) {
-        console.error(chalk.red(`❌ Failed to parse AI response: ${parseErr.message}`));
-        console.log(chalk.gray(`Raw response: ${text.substring(0, 200)}...`));
-        throw new Error('AI response parsing failed');
-      }
+      // Parse the AI response with improved error handling
+      const metadata = this.parseAIResponse(text);
+      
+      console.log(chalk.green('✅ Multi-frame AI analysis completed successfully!'));
+      console.log(chalk.blue(`📝 Generated Title: ${metadata.title}`));
+      console.log(chalk.blue(`📄 Generated Description: ${metadata.description}`));
+      console.log(chalk.blue(`🏷️ Generated Tags: ${metadata.tags}`));
+      console.log(chalk.gray(`🎬 Analysis based on ${frameImages.length} frames`));
+      
+      // Cleanup frame files
+      await this.cleanupTempFiles();
+      
+      return metadata;
 
     } catch (err) {
       console.error(chalk.red(`❌ Multi-frame video analysis failed: ${err.message}`));
@@ -262,7 +309,7 @@ Only return the JSON, nothing else.`;
   }
 
   /**
-   * Generate fallback metadata jika AI gagal
+   * Generate fallback metadata jika AI gagal - IMPROVED
    */
   generateFallbackMetadata(originalTitle = '', originalDescription = '') {
     const fallbackTitles = [

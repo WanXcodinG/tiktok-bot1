@@ -1,5 +1,4 @@
 const MultiPlatformDownloader = require('./multiPlatformDownloader');
-const RandomSearchGenerator = require('../utils/randomSearchGenerator');
 const chalk = require('chalk');
 
 /**
@@ -65,76 +64,7 @@ async function getMultiPlatformVideos(sources, options = {}) {
   }
 }
 
-/**
- * Get videos by category with random search terms - UPDATED
- */
-async function getVideosByCategory(category, count = 1) {
-  const searchGenerator = new RandomSearchGenerator();
-  
-  const categoryMappings = {
-    'Anime Edited Videos': {
-      platforms: ['YouTube'],
-      hashtags: 'anime edit, fight scenes, Japanese animation'
-    },
-    'Tech Shorts': {
-      platforms: ['YouTube'],
-      hashtags: 'tech, ai, gadgets, programming'
-    },
-    'Horror Clips': {
-      platforms: ['YouTube'],
-      hashtags: 'horror, scary, thriller, creepy'
-    },
-    'Made-Up TikTok Movies': {
-      platforms: ['YouTube', 'TikTok'],
-      hashtags: 'shortfilm, storytime, acting, movie'
-    },
-    'TikTok Viral': {
-      platforms: ['TikTok'],
-      hashtags: 'viral, trending, tiktok, fyp'
-    },
-    'Instagram Reels': {
-      platforms: ['Instagram'],
-      hashtags: 'reels, instagram, viral, trending'
-    }
-  };
-
-  const config = categoryMappings[category];
-  if (!config) {
-    throw new Error(`Category "${category}" not supported`);
-  }
-
-  console.log(chalk.cyan(`🎯 Fetching ${category} videos with random search...`));
-
-  try {
-    // Generate random search term using AI or fallback
-    const searchTerm = await searchGenerator.generateRandomSearch(category);
-    const platform = config.platforms[0]; // Use first platform as default
-
-    console.log(chalk.magenta(`🎲 Random search term: "${searchTerm}"`));
-
-    const results = await getMultiPlatformVideos(searchTerm, {
-      platform: platform,
-      limit: count,
-      quality: 1080
-    });
-
-    // Add category metadata
-    return results.map(result => ({
-      ...result,
-      category: category,
-      hashtags: config.hashtags,
-      videoId: result.id,
-      searchTerm: searchTerm // Add search term for reference
-    }));
-
-  } catch (err) {
-    console.error(chalk.red(`❌ Failed to fetch ${category} videos: ${err.message}`));
-    throw err;
-  }
-}
-
 module.exports = {
   getMultiPlatformVideos,
-  getVideosByCategory,
   MultiPlatformDownloader
 };

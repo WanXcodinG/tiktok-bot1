@@ -3,12 +3,11 @@ const inquirer = require("inquirer");
 const chalk = require("chalk");
 require("dotenv").config();
 const VideoCleanup = require("./utils/videoCleanup");
-const { getMultiPlatformVideos, getVideosByCategory } = require("./fetch/getMultiPlatformVideos");
+const { getMultiPlatformVideos } = require("./fetch/getMultiPlatformVideos");
 
 async function runInteractiveBot() {
   console.log(chalk.blueBright("📱 TikTok Multi-Platform Content Bot"));
   console.log(chalk.gray("Supports: YouTube, TikTok, Instagram, Facebook, Twitter"));
-  console.log(chalk.magenta("🎲 Now with Random Search & Smart Audio Detection!"));
   console.log(chalk.green("🧹 Auto-cleanup & Duplicate Management Enabled!"));
 
   const { inputType } = await inquirer.prompt([
@@ -17,7 +16,6 @@ async function runInteractiveBot() {
       name: "inputType",
       message: "How do you want to get videos?",
       choices: [
-        "📂 Choose from categories (Random Search)",
         "🔗 Provide direct URLs",
         "🔍 Search by keyword"
       ],
@@ -28,36 +26,7 @@ async function runInteractiveBot() {
   let category = "";
   let hashtags = "";
 
-  if (inputType === "📂 Choose from categories (Random Search)") {
-    const { selectedCategory } = await inquirer.prompt([
-      {
-        type: "list",
-        name: "selectedCategory",
-        message: "What type of content do you want to post?",
-        choices: [
-          "Anime Edited Videos",
-          "Tech Shorts", 
-          "Horror Clips",
-          "Made-Up TikTok Movies",
-          "TikTok Viral",
-          "Instagram Reels"
-        ],
-      },
-    ]);
-
-    category = selectedCategory;
-    console.log(chalk.green(`> You selected: ${category}`));
-    console.log(chalk.cyan(`🎲 Using random search with AI-powered audio detection!`));
-
-    try {
-      results = await getVideosByCategory(category, 1);
-      hashtags = results[0]?.hashtags || "viral, fyp, trending";
-    } catch (err) {
-      console.error(chalk.red(`❌ Failed to get ${category} videos: ${err.message}`));
-      return;
-    }
-
-  } else if (inputType === "🔗 Provide direct URLs") {
+  if (inputType === "🔗 Provide direct URLs") {
     const { urls } = await inquirer.prompt([
       {
         type: "input",
@@ -193,10 +162,6 @@ async function runInteractiveBot() {
   console.log(chalk.gray(`📱 Platform: ${video.platform}`));
   console.log(chalk.gray(`📁 File: ${video.localPath}`));
   console.log(chalk.gray(`🆔 Video ID: ${videoId}`));
-  
-  if (video.searchTerm) {
-    console.log(chalk.magenta(`🎲 Random search used: "${video.searchTerm}"`));
-  }
 
   // PROTECT THE DOWNLOADED FILE FROM CLEANUP
   if (video.localPath) {
@@ -288,9 +253,6 @@ async function runInteractiveBot() {
     console.log(chalk.gray(`   Title: ${video.title}`));
     console.log(chalk.gray(`   Platform: ${video.platform}`));
     console.log(chalk.gray(`   Category: ${category}`));
-    if (video.searchTerm) {
-      console.log(chalk.gray(`   Search Term: ${video.searchTerm}`));
-    }
     console.log(chalk.gray(`   Caption: ${caption}`));
 
   } catch (err) {

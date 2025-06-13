@@ -2,6 +2,7 @@ const ytDlpWrap = require('yt-dlp-wrap').default;
 const fs = require('fs-extra');
 const path = require('path');
 const chalk = require('chalk');
+const yts = require('yt-search');
 
 class MultiPlatformDownloader {
   constructor() {
@@ -207,71 +208,48 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Search and download from platform
+   * Search and download from YouTube using yt-search
    */
   async searchAndDownload(query, platform = 'YouTube', limit = 1) {
     try {
       console.log(chalk.blue(`🔍 Searching ${platform} for: "${query}"`));
       
-      let searchUrl;
-      switch (platform.toLowerCase()) {
-        case 'youtube':
-          searchUrl = `ytsearch${limit}:${query}`;
-          break;
-        case 'tiktok':
-          // TikTok search is limited, use direct URLs instead
-          throw new Error('TikTok search not supported, please provide direct URLs');
-        default:
-          throw new Error(`Search not supported for ${platform}`);
+      if (platform.toLowerCase() !== 'youtube') {
+        throw new Error(`Search only supported for YouTube. For other platforms, please provide direct URLs.`);
       }
 
-      const results = await this.ytDlp.exec([
-        searchUrl,
-        '--get-id',
-        '--get-title',
-        '--get-duration'
-      ]);
+      // Use yt-search for YouTube search
+      const searchResults = await yts(query);
+      const videos = searchResults.videos.slice(0, limit);
 
-      // Parse results and download
-      const videos = this.parseSearchResults(results, platform);
+      if (!videos || videos.length === 0) {
+        throw new Error(`No videos found for query: ${query}`);
+      }
+
+      console.log(chalk.green(`🎯 Found ${videos.length} video(s)`));
+
       const downloadResults = [];
-
-      for (const video of videos.slice(0, limit)) {
+      for (const video of videos) {
         try {
+          console.log(chalk.cyan(`📥 Processing: ${video.title}`));
           const downloadResult = await this.downloadVideo(video.url);
           downloadResults.push(downloadResult);
         } catch (err) {
           console.error(chalk.red(`❌ Failed to download ${video.title}: ${err.message}`));
+          downloadResults.push({
+            url: video.url,
+            title: video.title,
+            error: err.message,
+            success: false
+          });
         }
       }
 
-      return downloadResults;
+      return downloadResults.filter(result => !result.error);
     } catch (err) {
       console.error(chalk.red(`❌ Search and download failed: ${err.message}`));
       throw err;
     }
-  }
-
-  /**
-   * Parse search results
-   */
-  parseSearchResults(output, platform) {
-    // This is a simplified parser - in practice, you'd want more robust parsing
-    const lines = output.split('\n').filter(line => line.trim());
-    const videos = [];
-    
-    for (let i = 0; i < lines.length; i += 3) {
-      if (lines[i] && lines[i + 1]) {
-        videos.push({
-          id: lines[i].trim(),
-          title: lines[i + 1].trim(),
-          duration: lines[i + 2] ? lines[i + 2].trim() : 'Unknown',
-          url: platform === 'YouTube' ? `https://youtube.com/watch?v=${lines[i].trim()}` : lines[i].trim()
-        });
-      }
-    }
-    
-    return videos;
   }
 
   /**
@@ -285,7 +263,7 @@ class MultiPlatformDownloader {
    * Get supported platforms list
    */
   getSupportedPlatforms() {
-    return Object.values(this.supportedPlatforms);
+    return [...new Set(Object.values(this.supportedPlatforms))];
   }
 
   /**

@@ -12,6 +12,7 @@
   "description": "A Node.js automation bot that fetches, edits, and uploads engaging video content to TikTok. You can choose from anime edits, tech shorts, horror clips, or made-up TikTok movies. It also supports scheduled posting and daily video cleanup.",
   "dependencies": {
     "@distube/ytdl-core": "^4.16.8",
+    "@google/generative-ai": "^0.21.0",
     "axios": "^1.8.4",
     "chalk": "^4.1.2",
     "dotenv": "^16.4.7",

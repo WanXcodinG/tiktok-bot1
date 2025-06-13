@@ -1,6 +1,6 @@
-const axios = require("axios");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// Fallback captions for different categories
+// Fallback captions untuk berbagai kategori
 const fallbackCaptions = {
   anime: [
     "🔥 Epic anime moments that hit different #anime #edit #fyp #viral",
@@ -46,81 +46,54 @@ function getRandomFallbackCaption(topic) {
 }
 
 async function generateCaption(topic) {
-  console.log(`🧠 Generating caption for: ${topic}`);
+  console.log(`🧠 Generating caption with Gemini for: ${topic}`);
   
-  // Try multiple free AI services
-  const services = [
-    () => tryHuggingFace(topic),
-    () => tryGroqAPI(topic),
-    () => tryLocalGeneration(topic)
-  ];
+  // Cek apakah ada API key Gemini di environment
+  const apiKey = process.env.GEMINI_API_KEY;
   
-  for (const service of services) {
-    try {
-      const caption = await service();
-      if (caption && caption.length > 10) {
-        console.log("✅ Generated Caption:", caption);
-        return caption;
-      }
-    } catch (err) {
-      console.log(`⚠️ Service failed: ${err.message}`);
-      continue;
-    }
+  if (!apiKey) {
+    console.log("⚠️ GEMINI_API_KEY not found in environment, using fallback");
+    const fallbackCaption = getRandomFallbackCaption(topic);
+    console.log("🔄 Using fallback caption:", fallbackCaption);
+    return fallbackCaption;
   }
   
-  // If all services fail, use fallback
-  const fallbackCaption = getRandomFallbackCaption(topic);
-  console.log("🔄 Using fallback caption:", fallbackCaption);
-  return fallbackCaption;
-}
-
-async function tryHuggingFace(topic) {
-  const prompt = `Write a short TikTok caption for: "${topic}". Include hashtags. Max 80 chars.`;
-  
-  const response = await axios.post(
-    "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium",
-    {
-      inputs: prompt,
-      parameters: {
-        max_length: 80,
-        temperature: 0.7,
-        do_sample: true
-      },
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-      },
-      timeout: 10000
+  try {
+    // Initialize Gemini AI
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    
+    const prompt = `Create a catchy TikTok caption for a video about: "${topic}". 
+    Requirements:
+    - Maximum 100 characters
+    - Include relevant trending hashtags
+    - Use emojis to make it engaging
+    - Make it attention-grabbing and viral-worthy
+    - Focus on the main topic: ${topic}
+    
+    Just return the caption, nothing else.`;
+    
+    console.log("🤖 Calling Gemini API...");
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const caption = response.text().trim();
+    
+    // Validasi caption
+    if (caption && caption.length > 10 && caption.length <= 150) {
+      console.log("✅ Gemini Generated Caption:", caption);
+      return caption;
+    } else {
+      throw new Error("Invalid caption length or content");
     }
-  );
-
-  return response.data[0]?.generated_text?.trim();
-}
-
-async function tryGroqAPI(topic) {
-  // This would require a Groq API key, but it's free
-  // For now, we'll skip this and go to local generation
-  throw new Error("Groq API not configured");
-}
-
-function tryLocalGeneration(topic) {
-  // Simple local caption generation based on keywords
-  const hashtags = ["#fyp", "#viral", "#trending", "#foryou"];
-  const emojis = ["🔥", "✨", "💯", "🚀", "⚡", "👀", "😱", "🎬"];
-  
-  const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-  const randomHashtags = hashtags.slice(0, 3).join(" ");
-  
-  const templates = [
-    `${randomEmoji} This ${topic.split(',')[0]} hits different ${randomHashtags}`,
-    `POV: You found the perfect ${topic.split(',')[0]} ${randomEmoji} ${randomHashtags}`,
-    `${randomEmoji} Can't stop watching this ${randomHashtags}`,
-    `This is why I love ${topic.split(',')[0]} ${randomEmoji} ${randomHashtags}`
-  ];
-  
-  const caption = templates[Math.floor(Math.random() * templates.length)];
-  return caption.length > 100 ? caption.substring(0, 97) + "..." : caption;
+    
+  } catch (err) {
+    console.log(`❌ Gemini API failed: ${err.message}`);
+    
+    // Gunakan fallback jika Gemini gagal
+    const fallbackCaption = getRandomFallbackCaption(topic);
+    console.log("🔄 Using fallback caption:", fallbackCaption);
+    return fallbackCaption;
+  }
 }
 
 module.exports = generateCaption;

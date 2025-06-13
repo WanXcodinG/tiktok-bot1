@@ -1,53 +1,24 @@
-// ============================================================================
-// 🤖 TikTok All-in-One Bot - Complete Script
-// ============================================================================
-// Semua fungsi dalam satu file: Download, Edit, AI Analysis, Upload
-// Author: Cyber_Jay
-// Version: 2.0.0
-// ============================================================================
-
 const inquirer = require("inquirer");
 const chalk = require("chalk");
-const puppeteer = require("puppeteer");
 const ytDlpWrap = require('yt-dlp-wrap').default;
-const yts = require('yt-search');
-const ffmpeg = require("fluent-ffmpeg");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require('fs-extra');
 const path = require('path');
-const crypto = require('crypto');
+const yts = require('yt-search');
+const ffmpeg = require("fluent-ffmpeg");
+const puppeteer = require("puppeteer");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 require("dotenv").config();
 
-// ============================================================================
-// 🔧 CONFIGURATION
-// ============================================================================
-
-// Set FFmpeg path (update sesuai lokasi FFmpeg Anda)
+// Set FFmpeg path
 ffmpeg.setFfmpegPath("C:/ffmpeg/bin/ffmpeg.exe");
 
-// Directories
-const DIRS = {
-  raw: path.join(__dirname, 'videos/raw'),
-  edited: path.join(__dirname, 'videos/edited'),
-  temp: path.join(__dirname, 'temp'),
-  cookies: path.join(__dirname, 'cookies.json')
-};
-
-// Ensure directories exist
-Object.values(DIRS).forEach(dir => {
-  if (dir !== DIRS.cookies) {
-    fs.ensureDirSync(dir);
-  }
-});
-
-// ============================================================================
-// 🌐 MULTI-PLATFORM DOWNLOADER CLASS
-// ============================================================================
-
+/**
+ * Multi-Platform Downloader Class - FIXED
+ */
 class MultiPlatformDownloader {
   constructor() {
     this.ytDlp = new ytDlpWrap();
-    this.outputDir = DIRS.raw;
+    this.outputDir = path.join(__dirname, 'videos/raw');
     this.supportedPlatforms = {
       'youtube.com': 'YouTube',
       'youtu.be': 'YouTube',
@@ -60,11 +31,16 @@ class MultiPlatformDownloader {
       'twitter.com': 'Twitter',
       'x.com': 'Twitter'
     };
+    
+    fs.ensureDirSync(this.outputDir);
   }
 
   detectPlatform(url) {
     try {
-      if (!url || typeof url !== 'string') return 'Invalid URL';
+      if (!url || typeof url !== 'string') {
+        return 'Invalid URL';
+      }
+      
       const urlObj = new URL(url);
       const hostname = urlObj.hostname.replace('www.', '').replace('m.', '');
       
@@ -79,9 +55,31 @@ class MultiPlatformDownloader {
     }
   }
 
+  isValidUrl(url) {
+    try {
+      if (!url || typeof url !== 'string') {
+        return false;
+      }
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  generateId() {
+    return Math.random().toString(36).substring(2, 15);
+  }
+
+  getSupportedPlatforms() {
+    return [...new Set(Object.values(this.supportedPlatforms))];
+  }
+
   async getVideoInfo(url) {
     try {
-      if (!this.isValidUrl(url)) throw new Error('Invalid URL provided');
+      if (!this.isValidUrl(url)) {
+        throw new Error('Invalid URL provided');
+      }
       
       console.log(chalk.blue(`🔍 Getting video info from: ${this.detectPlatform(url)}`));
       
@@ -114,7 +112,9 @@ class MultiPlatformDownloader {
 
   async downloadVideo(url, options = {}) {
     try {
-      if (!this.isValidUrl(url)) throw new Error('Invalid URL provided for download');
+      if (!this.isValidUrl(url)) {
+        throw new Error('Invalid URL provided for download');
+      }
       
       const platform = this.detectPlatform(url);
       console.log(chalk.cyan(`📥 Downloading from ${platform}...`));
@@ -127,7 +127,6 @@ class MultiPlatformDownloader {
       const outputTemplate = path.join(this.outputDir, outputFilename);
       
       console.log(chalk.yellow(`⬇️ Downloading: ${videoInfo.title}`));
-      console.log(chalk.gray(`📁 Output template: ${outputTemplate}`));
       
       const downloadOptions = this.getDownloadOptions(platform, options);
       
@@ -138,6 +137,7 @@ class MultiPlatformDownloader {
       ];
       
       const cleanCommand = this.cleanCommandArray(command);
+      
       console.log(chalk.gray(`🔧 Command: yt-dlp ${cleanCommand.join(' ')}`));
       
       try {
@@ -152,7 +152,6 @@ class MultiPlatformDownloader {
       if (downloadedFile && fs.existsSync(downloadedFile)) {
         const stats = fs.statSync(downloadedFile);
         console.log(chalk.green(`✅ Downloaded successfully! Size: ${(stats.size / 1024 / 1024).toFixed(2)}MB`));
-        console.log(chalk.green(`📁 File location: ${downloadedFile}`));
         
         const finalFilename = `${platform.toLowerCase()}_${videoId}.mp4`;
         const finalPath = path.join(this.outputDir, finalFilename);
@@ -270,7 +269,9 @@ class MultiPlatformDownloader {
     for (let i = 0; i < command.length; i++) {
       const current = command[i];
       
-      if (!current || current.trim() === '') continue;
+      if (!current || current.trim() === '') {
+        continue;
+      }
       
       if (current.startsWith('--')) {
         if (!seenOptions.has(current)) {
@@ -304,11 +305,22 @@ class MultiPlatformDownloader {
     ];
 
     const platformOptions = {
-      'YouTube': ['--format', 'best[ext=mp4][height<=1080]/best[ext=mp4]/best'],
-      'TikTok': ['--format', 'best', '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'],
-      'Instagram': ['--format', 'best'],
-      'Facebook': ['--format', 'best'],
-      'Twitter': ['--format', 'best']
+      'YouTube': [
+        '--format', 'best[ext=mp4][height<=1080]/best[ext=mp4]/best'
+      ],
+      'TikTok': [
+        '--format', 'best',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      ],
+      'Instagram': [
+        '--format', 'best'
+      ],
+      'Facebook': [
+        '--format', 'best'
+      ],
+      'Twitter': [
+        '--format', 'best'
+      ]
     };
 
     let options = [...baseOptions];
@@ -333,6 +345,36 @@ class MultiPlatformDownloader {
     return options;
   }
 
+  async downloadMultiple(urls, options = {}) {
+    const results = [];
+    
+    for (const url of urls) {
+      try {
+        if (!this.isValidUrl(url)) {
+          throw new Error('Invalid URL format');
+        }
+        
+        const result = await this.downloadVideo(url, options);
+        results.push(result);
+        
+        if (urls.length > 1) {
+          console.log(chalk.gray('⏳ Waiting 3 seconds before next download...'));
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      } catch (err) {
+        console.error(chalk.red(`❌ Failed to download ${url}: ${err.message}`));
+        results.push({
+          url,
+          error: err.message,
+          success: false
+        });
+      }
+    }
+    
+    return results;
+  }
+
+  // FIXED: Enhanced search with proper error handling
   async searchAndDownload(query, platform = 'YouTube', limit = 1) {
     try {
       if (!query || typeof query !== 'string' || query.trim().length === 0) {
@@ -346,120 +388,176 @@ class MultiPlatformDownloader {
       }
 
       const searchResults = await yts(query);
-      const videos = searchResults.videos.slice(0, limit);
-
-      if (!videos || videos.length === 0) {
+      
+      if (!searchResults || !searchResults.videos || searchResults.videos.length === 0) {
         throw new Error(`No videos found for query: ${query}`);
       }
 
-      console.log(chalk.green(`🎯 Found ${videos.length} video(s)`));
+      // FIXED: Enhanced search with proper filtering
+      const videos = this.enhancedVideoFilter(searchResults.videos, query, limit);
 
-      const downloadResults = [];
-      for (const video of videos) {
-        try {
-          console.log(chalk.cyan(`📥 Processing: ${video.title}`));
-          const downloadResult = await this.downloadVideo(video.url);
-          downloadResults.push(downloadResult);
-        } catch (err) {
-          console.error(chalk.red(`❌ Failed to download ${video.title}: ${err.message}`));
-          downloadResults.push({
-            url: video.url,
-            title: video.title,
-            error: err.message,
-            success: false
-          });
-        }
+      if (!videos || videos.length === 0) {
+        console.log(chalk.yellow('⚠️ Enhanced search found no matches, using top results'));
+        // Fallback to top results
+        const fallbackVideos = searchResults.videos.slice(0, limit);
+        return await this.downloadVideosFromResults(fallbackVideos);
       }
 
-      return downloadResults.filter(result => !result.error);
+      console.log(chalk.green(`🎯 Found ${videos.length} relevant video(s)`));
+      return await this.downloadVideosFromResults(videos);
+
     } catch (err) {
       console.error(chalk.red(`❌ Search and download failed: ${err.message}`));
       throw err;
     }
   }
 
-  generateId() {
-    return Math.random().toString(36).substring(2, 15);
+  // FIXED: Enhanced video filtering with proper error handling
+  enhancedVideoFilter(videos, query, limit) {
+    try {
+      const queryWords = query.toLowerCase().split(' ').filter(word => word.length > 2);
+      
+      const scoredVideos = videos.map(video => {
+        let score = 0;
+        const title = (video.title || '').toLowerCase();
+        const description = (video.description || '').toLowerCase();
+        
+        // Title matching (higher weight)
+        queryWords.forEach(word => {
+          if (title.includes(word)) score += 3;
+          if (description.includes(word)) score += 1;
+        });
+        
+        // Duration filter (prefer 30s - 10min videos)
+        const duration = video.duration?.seconds || 0;
+        if (duration >= 30 && duration <= 600) {
+          score += 2;
+        }
+        
+        // Views filter - FIXED: Handle different view formats
+        let viewCount = 0;
+        if (video.views) {
+          if (typeof video.views === 'string') {
+            // Handle string views like "1.2M views", "500K views", etc.
+            const viewStr = video.views.toLowerCase().replace(/[^0-9.kmb]/g, '');
+            if (viewStr.includes('k')) {
+              viewCount = parseFloat(viewStr) * 1000;
+            } else if (viewStr.includes('m')) {
+              viewCount = parseFloat(viewStr) * 1000000;
+            } else if (viewStr.includes('b')) {
+              viewCount = parseFloat(viewStr) * 1000000000;
+            } else {
+              viewCount = parseFloat(viewStr) || 0;
+            }
+          } else if (typeof video.views === 'number') {
+            viewCount = video.views;
+          }
+        }
+        
+        // Prefer videos with decent view count
+        if (viewCount > 1000) score += 1;
+        if (viewCount > 100000) score += 2;
+        
+        return { ...video, relevanceScore: score };
+      });
+      
+      // Sort by relevance score and return top results
+      const sortedVideos = scoredVideos
+        .filter(video => video.relevanceScore > 0)
+        .sort((a, b) => b.relevanceScore - a.relevanceScore)
+        .slice(0, limit);
+      
+      console.log(chalk.blue(`📊 Top matches:`));
+      sortedVideos.forEach((video, index) => {
+        console.log(chalk.gray(`   ${index + 1}. ${video.title} (Score: ${video.relevanceScore})`));
+      });
+      
+      return sortedVideos;
+    } catch (err) {
+      console.error(chalk.red(`❌ Error in enhanced filtering: ${err.message}`));
+      // Return original videos as fallback
+      return videos.slice(0, limit);
+    }
   }
 
-  isValidUrl(url) {
-    try {
-      if (!url || typeof url !== 'string') return false;
-      new URL(url);
-      return true;
-    } catch {
-      return false;
+  async downloadVideosFromResults(videos) {
+    const downloadResults = [];
+    
+    for (const video of videos) {
+      try {
+        console.log(chalk.cyan(`📥 Processing: ${video.title}`));
+        const downloadResult = await this.downloadVideo(video.url);
+        downloadResults.push(downloadResult);
+      } catch (err) {
+        console.error(chalk.red(`❌ Failed to download ${video.title}: ${err.message}`));
+        downloadResults.push({
+          url: video.url,
+          title: video.title,
+          error: err.message,
+          success: false
+        });
+      }
     }
+
+    return downloadResults.filter(result => !result.error);
   }
 }
 
-// ============================================================================
-// 🤖 VIDEO ANALYZER CLASS
-// ============================================================================
-
+/**
+ * Video Analyzer Class
+ */
 class VideoAnalyzer {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
     this.genAI = this.apiKey ? new GoogleGenerativeAI(this.apiKey) : null;
+    this.tempDir = path.join(__dirname, 'temp');
+    fs.ensureDirSync(this.tempDir);
   }
 
-  async extractFrames(videoPath, numFrames = 10) {
+  async extractFrames(videoPath, frameCount = 10) {
     try {
-      console.log(chalk.cyan(`📸 Extracting ${numFrames} frames for analysis...`));
-      
-      const frameDir = path.join(DIRS.temp, `frames_${Date.now()}`);
-      fs.ensureDirSync(frameDir);
+      console.log(chalk.cyan(`📸 Extracting ${frameCount} frames for analysis...`));
       
       const frames = [];
+      const frameInterval = 100 / frameCount; // Distribute frames across video
       
-      return new Promise((resolve, reject) => {
-        ffmpeg(videoPath)
-          .on('end', () => {
-            const frameFiles = fs.readdirSync(frameDir)
-              .filter(file => file.endsWith('.jpg'))
-              .sort()
-              .slice(0, numFrames);
-            
-            for (const frameFile of frameFiles) {
-              const framePath = path.join(frameDir, frameFile);
-              if (fs.existsSync(framePath)) {
-                const frameData = fs.readFileSync(framePath);
-                frames.push({
-                  data: frameData.toString('base64'),
-                  mimeType: 'image/jpeg'
-                });
-              }
-            }
-            
-            // Cleanup frame directory
-            fs.removeSync(frameDir);
-            
-            console.log(chalk.green(`✅ Extracted ${frames.length} frames`));
-            resolve(frames);
-          })
-          .on('error', (err) => {
-            console.error(chalk.red(`❌ Frame extraction error: ${err.message}`));
-            fs.removeSync(frameDir);
-            reject(err);
-          })
-          .output(path.join(frameDir, 'frame_%03d.jpg'))
-          .outputOptions([
-            '-vf', `fps=1/${Math.max(1, Math.floor(30 / numFrames))}`,
-            '-q:v', '2'
-          ])
-          .run();
-      });
+      for (let i = 0; i < frameCount; i++) {
+        const timestamp = `${i * frameInterval}%`;
+        const framePath = path.join(this.tempDir, `frame_${i}.jpg`);
+        
+        await new Promise((resolve, reject) => {
+          ffmpeg(videoPath)
+            .seekInput(timestamp)
+            .frames(1)
+            .output(framePath)
+            .on('end', resolve)
+            .on('error', reject)
+            .run();
+        });
+        
+        if (fs.existsSync(framePath)) {
+          const frameData = fs.readFileSync(framePath);
+          frames.push({
+            data: frameData.toString('base64'),
+            mimeType: 'image/jpeg',
+            timestamp: timestamp
+          });
+        }
+      }
+      
+      console.log(chalk.green(`✅ Extracted ${frames.length} frames`));
+      return frames;
     } catch (err) {
-      console.error(chalk.red(`❌ Error extracting frames: ${err.message}`));
+      console.error(chalk.red(`❌ Frame extraction failed: ${err.message}`));
       return [];
     }
   }
 
-  async analyzeVideoContent(videoPath, title = '', description = '') {
+  async analyzeVideoContent(videoPath, videoTitle = '', videoDescription = '') {
     try {
       if (!this.genAI) {
-        console.log(chalk.yellow('⚠️ No Gemini API key found, using fallback analysis'));
-        return this.getFallbackAnalysis(title, description);
+        console.log(chalk.yellow('⚠️ No Gemini API key, using fallback analysis'));
+        return this.getFallbackAnalysis(videoTitle, videoDescription);
       }
 
       console.log(chalk.cyan('🤖 Analyzing video content with Gemini AI...'));
@@ -468,7 +566,7 @@ class VideoAnalyzer {
       
       if (frames.length === 0) {
         console.log(chalk.yellow('⚠️ No frames extracted, using text-only analysis'));
-        return await this.analyzeTextOnly(title, description);
+        return await this.analyzeTextOnly(videoTitle, videoDescription);
       }
 
       const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -476,25 +574,23 @@ class VideoAnalyzer {
       const prompt = `Analyze this video content and generate TikTok-optimized metadata.
 
 Video Information:
-- Title: "${title}"
-- Description: "${description}"
+- Title: "${videoTitle}"
+- Description: "${videoDescription}"
 - Frames: ${frames.length} frames extracted
 
 Please analyze the visual content and provide:
 
-1. TITLE: A catchy, viral TikTok title (max 100 chars)
-2. DESCRIPTION: Brief description of what's happening (max 150 chars)  
-3. TAGS: 10 relevant hashtags for TikTok (include #viral #fyp #trending)
-4. CATEGORY: Main category (music, dance, comedy, education, etc.)
-5. MOOD: Overall mood/vibe (energetic, chill, funny, dramatic, etc.)
+1. **Title**: Catchy, viral-worthy title (max 60 chars)
+2. **Description**: Engaging description (max 100 chars)  
+3. **Tags**: 8-10 relevant hashtags for TikTok
+4. **Category**: Main content category (anime/tech/horror/music/dance/comedy/etc)
 
 Format your response as JSON:
 {
   "title": "...",
   "description": "...", 
-  "tags": ["#viral", "#fyp", ...],
-  "category": "...",
-  "mood": "..."
+  "tags": ["tag1", "tag2", ...],
+  "category": "..."
 }`;
 
       const imageParts = frames.map(frame => ({
@@ -509,109 +605,193 @@ Format your response as JSON:
       const text = response.text();
       
       try {
-        const analysis = JSON.parse(text.replace(/```json\n?|\n?```/g, ''));
+        const analysis = JSON.parse(text);
         console.log(chalk.green('✅ Multi-frame AI analysis completed!'));
         return analysis;
       } catch (parseErr) {
-        console.log(chalk.yellow('⚠️ Failed to parse AI response, using fallback'));
-        return this.getFallbackAnalysis(title, description);
+        console.log(chalk.yellow('⚠️ AI response parsing failed, extracting data manually'));
+        return this.parseAIResponse(text);
       }
-      
+
     } catch (err) {
-      console.error(chalk.red(`❌ Video analysis error: ${err.message}`));
-      return this.getFallbackAnalysis(title, description);
+      console.error(chalk.red(`❌ AI analysis failed: ${err.message}`));
+      return this.getFallbackAnalysis(videoTitle, videoDescription);
+    } finally {
+      // Cleanup temp frames
+      this.cleanupTempFrames();
     }
   }
 
-  async analyzeTextOnly(title, description) {
+  async analyzeTextOnly(videoTitle, videoDescription) {
     try {
       const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       
       const prompt = `Based on this video title and description, generate TikTok metadata:
 
-Title: "${title}"
-Description: "${description}"
+Title: "${videoTitle}"
+Description: "${videoDescription}"
 
-Provide JSON response with: title, description, tags, category, mood`;
+Generate:
+1. Catchy TikTok title (max 60 chars)
+2. Engaging description (max 100 chars)
+3. 8-10 relevant hashtags
+4. Content category
+
+Return as JSON:
+{
+  "title": "...",
+  "description": "...",
+  "tags": ["tag1", "tag2", ...],
+  "category": "..."
+}`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
-      const analysis = JSON.parse(text.replace(/```json\n?|\n?```/g, ''));
-      return analysis;
+      try {
+        return JSON.parse(text);
+      } catch (parseErr) {
+        return this.parseAIResponse(text);
+      }
     } catch (err) {
-      return this.getFallbackAnalysis(title, description);
+      console.error(chalk.red(`❌ Text-only analysis failed: ${err.message}`));
+      return this.getFallbackAnalysis(videoTitle, videoDescription);
     }
   }
 
-  getFallbackAnalysis(title, description) {
-    const text = `${title} ${description}`.toLowerCase();
-    
-    let category = 'entertainment';
-    let mood = 'energetic';
-    let tags = ['#viral', '#fyp', '#trending', '#foryou'];
-    
-    if (text.includes('music') || text.includes('song') || text.includes('dj')) {
-      category = 'music';
-      tags.push('#music', '#song', '#beat', '#dance');
-    } else if (text.includes('funny') || text.includes('comedy')) {
-      category = 'comedy';
-      mood = 'funny';
-      tags.push('#funny', '#comedy', '#laugh', '#humor');
-    } else if (text.includes('dance')) {
-      category = 'dance';
-      tags.push('#dance', '#dancing', '#moves', '#choreography');
-    } else if (text.includes('food')) {
-      category = 'food';
-      tags.push('#food', '#cooking', '#recipe', '#foodie');
+  parseAIResponse(text) {
+    try {
+      const lines = text.split('\n');
+      const analysis = {
+        title: '',
+        description: '',
+        tags: [],
+        category: 'general'
+      };
+
+      lines.forEach(line => {
+        const lower = line.toLowerCase();
+        if (lower.includes('title') && lower.includes(':')) {
+          analysis.title = line.split(':')[1].trim().replace(/['"]/g, '');
+        } else if (lower.includes('description') && lower.includes(':')) {
+          analysis.description = line.split(':')[1].trim().replace(/['"]/g, '');
+        } else if (lower.includes('category') && lower.includes(':')) {
+          analysis.category = line.split(':')[1].trim().replace(/['"]/g, '');
+        } else if (line.includes('#')) {
+          const hashtags = line.match(/#\w+/g);
+          if (hashtags) {
+            analysis.tags.push(...hashtags.map(tag => tag.replace('#', '')));
+          }
+        }
+      });
+
+      return analysis;
+    } catch (err) {
+      console.error(chalk.red(`❌ Response parsing failed: ${err.message}`));
+      return this.getFallbackAnalysis('', '');
     }
+  }
+
+  getFallbackAnalysis(videoTitle, videoDescription) {
+    const text = `${videoTitle} ${videoDescription}`.toLowerCase();
     
+    let category = 'general';
+    let tags = ['viral', 'fyp', 'trending'];
+    
+    if (text.includes('anime') || text.includes('manga')) {
+      category = 'anime';
+      tags = ['anime', 'edit', 'amv', 'manga', 'otaku', 'viral', 'fyp'];
+    } else if (text.includes('tech') || text.includes('ai') || text.includes('robot')) {
+      category = 'tech';
+      tags = ['tech', 'ai', 'technology', 'gadget', 'innovation', 'viral', 'fyp'];
+    } else if (text.includes('horror') || text.includes('scary')) {
+      category = 'horror';
+      tags = ['horror', 'scary', 'creepy', 'thriller', 'nightmare', 'viral', 'fyp'];
+    } else if (text.includes('music') || text.includes('song') || text.includes('dj')) {
+      category = 'music';
+      tags = ['music', 'song', 'beat', 'dj', 'dance', 'viral', 'fyp'];
+    }
+
     return {
-      title: title || 'Amazing Video Content!',
-      description: description || 'Check out this incredible video!',
+      title: videoTitle || 'Amazing Video Content!',
+      description: videoDescription || 'Check out this incredible video!',
       tags: tags,
-      category: category,
-      mood: mood
+      category: category
     };
+  }
+
+  cleanupTempFrames() {
+    try {
+      if (fs.existsSync(this.tempDir)) {
+        const files = fs.readdirSync(this.tempDir);
+        files.forEach(file => {
+          if (file.startsWith('frame_')) {
+            fs.removeSync(path.join(this.tempDir, file));
+          }
+        });
+      }
+    } catch (err) {
+      console.error(chalk.red(`❌ Temp cleanup failed: ${err.message}`));
+    }
   }
 }
 
-// ============================================================================
-// 🧹 VIDEO CLEANUP CLASS
-// ============================================================================
-
+/**
+ * Video Cleanup Class
+ */
 class VideoCleanup {
   constructor() {
-    this.protectedFiles = new Map();
+    this.rawDir = path.join(__dirname, 'videos/raw');
+    this.editedDir = path.join(__dirname, 'videos/edited');
+    this.tempDir = path.join(__dirname, 'temp');
+    
+    fs.ensureDirSync(this.rawDir);
+    fs.ensureDirSync(this.editedDir);
+    fs.ensureDirSync(this.tempDir);
+    
+    this.protectedFiles = new Set();
+    this.protectionTimers = new Map();
   }
 
-  protectFile(filePath, durationMinutes = 30) {
-    const expiryTime = Date.now() + (durationMinutes * 60 * 1000);
-    this.protectedFiles.set(filePath, expiryTime);
-    console.log(chalk.blue(`🛡️ Protected file from cleanup: ${path.basename(filePath)} (${durationMinutes}min)`));
+  protectFile(filePath, durationMinutes = 60) {
+    try {
+      const absolutePath = path.resolve(filePath);
+      this.protectedFiles.add(absolutePath);
+      
+      console.log(chalk.blue(`🛡️ Protected file from cleanup: ${path.basename(filePath)} (${durationMinutes}min)`));
+      
+      // Clear existing timer if any
+      if (this.protectionTimers.has(absolutePath)) {
+        clearTimeout(this.protectionTimers.get(absolutePath));
+      }
+      
+      // Set new timer
+      const timer = setTimeout(() => {
+        this.protectedFiles.delete(absolutePath);
+        this.protectionTimers.delete(absolutePath);
+        console.log(chalk.gray(`🔓 File protection expired: ${path.basename(filePath)}`));
+      }, durationMinutes * 60 * 1000);
+      
+      this.protectionTimers.set(absolutePath, timer);
+    } catch (err) {
+      console.error(chalk.red(`❌ Error protecting file: ${err.message}`));
+    }
   }
 
   isFileProtected(filePath) {
-    const expiryTime = this.protectedFiles.get(filePath);
-    if (!expiryTime) return false;
-    
-    if (Date.now() > expiryTime) {
-      this.protectedFiles.delete(filePath);
-      return false;
-    }
-    
-    return true;
+    const absolutePath = path.resolve(filePath);
+    return this.protectedFiles.has(absolutePath);
   }
 
-  async cleanupOldFilesExceptCurrent(currentVideoId, maxAgeMinutes = 30) {
+  async cleanupOldFilesExceptCurrent(currentVideoPath = '', maxAgeHours = 2) {
     try {
-      console.log(chalk.cyan(`🧹 Cleaning files older than ${maxAgeMinutes} minutes (protecting current video)...`));
+      console.log(chalk.cyan('🧹 Performing cleanup of old files...'));
       
       const now = Date.now();
-      const maxAge = maxAgeMinutes * 60 * 1000;
+      const maxAge = maxAgeHours * 60 * 60 * 1000;
       
-      const directories = [DIRS.raw, DIRS.edited];
+      const directories = [this.rawDir, this.editedDir, this.tempDir];
       let totalRemoved = 0;
       
       for (const dir of directories) {
@@ -628,119 +808,35 @@ class VideoCleanup {
             continue;
           }
           
-          // Skip if file contains current video ID
-          if (currentVideoId && file.includes(currentVideoId)) {
-            console.log(chalk.blue(`🎯 Skipping current video file: ${file}`));
+          // Skip current video file
+          if (currentVideoPath && filePath === path.resolve(currentVideoPath)) {
+            console.log(chalk.blue(`📹 Skipping current video: ${file}`));
             continue;
           }
           
-          const stats = fs.statSync(filePath);
-          const fileAge = now - stats.mtime.getTime();
-          
-          if (fileAge > maxAge) {
-            try {
+          try {
+            const stats = fs.statSync(filePath);
+            const fileAge = now - stats.mtime.getTime();
+            
+            if (fileAge > maxAge) {
               await fs.remove(filePath);
-              console.log(chalk.gray(`🗑️ Removed old file: ${file} (${Math.round(fileAge / (60 * 1000))}min old)`));
+              console.log(chalk.gray(`🗑️ Removed old file: ${file} (${Math.round(fileAge / (60 * 60 * 1000))}h old)`));
               totalRemoved++;
-            } catch (err) {
-              console.error(chalk.red(`❌ Failed to remove old file ${filePath}: ${err.message}`));
             }
+          } catch (err) {
+            console.error(chalk.red(`❌ Error processing file ${filePath}: ${err.message}`));
           }
         }
       }
       
       if (totalRemoved > 0) {
-        console.log(chalk.green(`✅ Removed ${totalRemoved} old file(s)`));
+        console.log(chalk.green(`✅ Cleaned up ${totalRemoved} old file(s)`));
       } else {
-        console.log(chalk.gray(`✅ No old files to remove`));
+        console.log(chalk.gray(`✅ No old files to clean`));
       }
       
     } catch (err) {
-      console.error(chalk.red(`❌ Error cleaning old files: ${err.message}`));
-    }
-  }
-
-  async cleanupAfterUpload(videoId, success = true) {
-    try {
-      console.log(chalk.cyan(`🧹 Post-upload cleanup for video: ${videoId}`));
-      
-      if (success) {
-        console.log(chalk.green(`✅ Upload successful - cleaning up all files`));
-        await this.cleanupVideoFiles(videoId, false);
-      } else {
-        console.log(chalk.yellow(`⚠️ Upload failed - keeping raw file, removing processed files`));
-        const processedFiles = [
-          path.join(DIRS.edited, `${videoId}-edited.mp4`),
-          path.join(DIRS.edited, `${videoId}-final.mp4`)
-        ];
-        
-        for (const filePath of processedFiles) {
-          try {
-            if (fs.existsSync(filePath)) {
-              await fs.remove(filePath);
-              console.log(chalk.gray(`🗑️ Removed processed file: ${path.basename(filePath)}`));
-            }
-          } catch (err) {
-            console.error(chalk.red(`❌ Failed to remove ${filePath}: ${err.message}`));
-          }
-        }
-      }
-      
-    } catch (err) {
-      console.error(chalk.red(`❌ Error in post-upload cleanup: ${err.message}`));
-    }
-  }
-
-  async cleanupVideoFiles(videoId, keepOriginal = false) {
-    try {
-      console.log(chalk.cyan(`🧹 Cleaning up files for video: ${videoId}`));
-      
-      const filesToClean = [];
-      const allDirs = [DIRS.raw, DIRS.edited];
-      
-      for (const dir of allDirs) {
-        if (fs.existsSync(dir)) {
-          const files = fs.readdirSync(dir);
-          
-          for (const file of files) {
-            const fileContainsId = file.includes(videoId) || 
-                                  file.includes(videoId.replace(/[^a-zA-Z0-9]/g, '')) ||
-                                  file.split('_').some(part => part === videoId);
-            
-            if (fileContainsId) {
-              const filePath = path.join(dir, file);
-              
-              if (keepOriginal && dir === DIRS.raw && !file.includes('-edited') && !file.includes('-final')) {
-                continue;
-              }
-              
-              filesToClean.push(filePath);
-            }
-          }
-        }
-      }
-      
-      let removedCount = 0;
-      for (const filePath of filesToClean) {
-        try {
-          if (fs.existsSync(filePath)) {
-            await fs.remove(filePath);
-            console.log(chalk.gray(`🗑️ Removed: ${path.basename(filePath)}`));
-            removedCount++;
-          }
-        } catch (err) {
-          console.error(chalk.red(`❌ Failed to remove ${filePath}: ${err.message}`));
-        }
-      }
-      
-      if (removedCount > 0) {
-        console.log(chalk.green(`✅ Cleaned up ${removedCount} file(s) for video ${videoId}`));
-      }
-      
-      return removedCount;
-    } catch (err) {
-      console.error(chalk.red(`❌ Error cleaning up video files: ${err.message}`));
-      return 0;
+      console.error(chalk.red(`❌ Cleanup error: ${err.message}`));
     }
   }
 
@@ -749,12 +845,14 @@ class VideoCleanup {
       const stats = {
         raw: { count: 0, size: 0 },
         edited: { count: 0, size: 0 },
+        temp: { count: 0, size: 0 },
         total: { count: 0, size: 0 }
       };
       
       const directories = [
-        { key: 'raw', path: DIRS.raw },
-        { key: 'edited', path: DIRS.edited }
+        { key: 'raw', path: this.rawDir },
+        { key: 'edited', path: this.editedDir },
+        { key: 'temp', path: this.tempDir }
       ];
       
       for (const { key, path: dirPath } of directories) {
@@ -787,19 +885,23 @@ class VideoCleanup {
   }
 }
 
-// ============================================================================
-// 🎬 VIDEO EDITOR FUNCTION
-// ============================================================================
-
-async function editVideo(inputPath, outputPath, options = {}) {
+/**
+ * Edit Video Function
+ */
+async function editVideo(inputPath, outputName = "edited.mp4", options = {}) {
   const { startTime = "00:00:03", duration = 30, audio = true } = options;
 
   if (!inputPath || !fs.existsSync(inputPath)) {
     throw new Error("❌ Input video file does not exist.");
   }
 
-  const outputDir = path.dirname(outputPath);
-  fs.ensureDirSync(outputDir);
+  const editedVideosDir = path.join(__dirname, "videos", "edited");
+  fs.ensureDirSync(editedVideosDir);
+
+  const cleanedOutputName = path.basename(outputName);
+  const outputPath = path.join(editedVideosDir, cleanedOutputName);
+
+  console.log("📁 Saving to path:", outputPath);
 
   if (fs.existsSync(outputPath)) {
     fs.removeSync(outputPath);
@@ -810,57 +912,46 @@ async function editVideo(inputPath, outputPath, options = {}) {
       .setStartTime(startTime)
       .duration(duration)
       .videoCodec("libx264")
-      .size("720x1280"); // TikTok format
+      .size("720x1280");
 
     if (!audio) {
       command.noAudio();
-    } else {
-      command.audioCodec("aac").audioBitrate("128k");
     }
 
     command
       .on("progress", (progress) => {
         if (progress.percent) {
-          console.log(chalk.blue(`🎬 Editing progress: ${progress.percent.toFixed(1)}%`));
+          console.log(`⏳ Processing: ${progress.percent.toFixed(1)}%`);
         }
       })
       .on("end", () => {
-        console.log(chalk.green(`✅ Video edited successfully: ${outputPath}`));
+        console.log("✅ Video edited and saved to:", outputPath);
         resolve(outputPath);
       })
       .on("error", (err) => {
-        console.error(chalk.red(`❌ Error during video editing: ${err.message}`));
+        console.error("❌ Error during video processing:", err.message);
         reject(err);
       })
       .save(outputPath);
   });
 }
 
-// ============================================================================
-// 🎵 AUDIO PROCESSOR FUNCTION
-// ============================================================================
-
-async function processVideoAudio(inputPath, outputPath) {
+/**
+ * Process Video Audio Function
+ */
+async function processVideoAudio(videoPath, outputPath) {
   try {
-    console.log(chalk.cyan('🎵 Processing video with original audio...'));
+    console.log(chalk.cyan(`🎵 Processing video with original audio...`));
     
-    if (!fs.existsSync(inputPath)) {
-      throw new Error(`Input video file not found: ${inputPath}`);
+    if (!fs.existsSync(videoPath)) {
+      throw new Error(`Video file not found: ${videoPath}`);
     }
     
     return new Promise((resolve, reject) => {
-      ffmpeg(inputPath)
+      ffmpeg(videoPath)
         .videoCodec('copy')
         .audioCodec('aac')
         .audioBitrate('128k')
-        .on('start', (commandLine) => {
-          console.log(chalk.gray(`🔧 FFmpeg command: ${commandLine}`));
-        })
-        .on('progress', (progress) => {
-          if (progress.percent) {
-            console.log(chalk.blue(`🎵 Audio processing: ${progress.percent.toFixed(1)}%`));
-          }
-        })
         .on('end', () => {
           console.log(chalk.green(`✅ Audio processing completed: ${outputPath}`));
           resolve(outputPath);
@@ -878,11 +969,12 @@ async function processVideoAudio(inputPath, outputPath) {
   }
 }
 
-// ============================================================================
-// 📤 TIKTOK UPLOADER FUNCTION
-// ============================================================================
+/**
+ * Upload to TikTok Function
+ */
+async function uploadToTikTok(videoPath, caption = "#bot #foryou #edit #fyp") {
+  const cookiesPath = path.join(__dirname, "cookies.json");
 
-async function uploadToTikTok(videoPath, caption = "#viral #fyp #trending #foryou") {
   const browser = await puppeteer.launch({
     headless: false,
     defaultViewport: null,
@@ -905,9 +997,9 @@ async function uploadToTikTok(videoPath, caption = "#viral #fyp #trending #foryo
   );
 
   let loggedInWithCookies = false;
-  if (fs.existsSync(DIRS.cookies)) {
+  if (fs.existsSync(cookiesPath)) {
     try {
-      const cookies = JSON.parse(fs.readFileSync(DIRS.cookies));
+      const cookies = JSON.parse(fs.readFileSync(cookiesPath));
       if (cookies && cookies.length > 0) {
         await page.setCookie(...cookies);
         loggedInWithCookies = true;
@@ -945,7 +1037,7 @@ async function uploadToTikTok(videoPath, caption = "#viral #fyp #trending #foryo
         isLoggedIn = true;
 
         const cookies = await page.cookies();
-        fs.writeFileSync(DIRS.cookies, JSON.stringify(cookies, null, 2));
+        fs.writeFileSync(cookiesPath, JSON.stringify(cookies, null, 2));
         console.log("💾 Cookies saved.");
       } catch (e) {
         console.error("❌ Login timeout. Try again.");
@@ -1029,7 +1121,6 @@ async function uploadToTikTok(videoPath, caption = "#viral #fyp #trending #foryo
       console.log("🚀 Looking for Post button...");
       let posted = false;
       
-      // Strategy 1: Specific selector
       try {
         const specificSelector = "#root > div > div > div.css-fsbw52.ep9i2zp0 > div.css-86gjln.edss2sz5 > div > div > div > div.jsx-3335848873.footer > div > button.Button__root.Button__root--shape-default.Button__root--size-large.Button__root--type-primary.Button__root--loading-false > div.Button__content.Button__content--shape-default.Button__content--size-large.Button__content--type-primary.Button__content--loading-false";
         
@@ -1046,7 +1137,6 @@ async function uploadToTikTok(videoPath, caption = "#viral #fyp #trending #foryo
         console.log("Specific selector failed, trying alternative strategies...");
       }
       
-      // Strategy 2: data-e2e attribute
       if (!posted) {
         try {
           const publishButton = await page.$('button[data-e2e="publish-button"]');
@@ -1060,7 +1150,6 @@ async function uploadToTikTok(videoPath, caption = "#viral #fyp #trending #foryo
         }
       }
       
-      // Strategy 3: Search by button classes and text content
       if (!posted) {
         try {
           const postButton = await page.evaluateHandle(() => {
@@ -1092,7 +1181,6 @@ async function uploadToTikTok(videoPath, caption = "#viral #fyp #trending #foryo
         }
       }
       
-      // Strategy 4: Common button selectors
       if (!posted) {
         const buttonSelectors = [
           'button[type="submit"]',
@@ -1144,96 +1232,58 @@ async function uploadToTikTok(videoPath, caption = "#viral #fyp #trending #foryo
   }
 }
 
-// ============================================================================
-// 🤖 AI CAPTION GENERATOR FUNCTION
-// ============================================================================
-
-async function generateCaption(videoPath, title = '', description = '') {
-  console.log(chalk.cyan('🤖 Generating AI-powered caption...'));
-  
-  const apiKey = process.env.GEMINI_API_KEY;
-  
-  if (!apiKey) {
-    console.log(chalk.yellow("⚠️ GEMINI_API_KEY not found, using fallback caption"));
-    return getFallbackCaption(title, description);
-  }
-  
+/**
+ * Generate Caption Function
+ */
+async function generateCaption(analysis) {
   try {
-    const analyzer = new VideoAnalyzer();
-    const analysis = await analyzer.analyzeVideoContent(videoPath, title, description);
+    console.log('📋 Generating TikTok caption...');
     
-    const caption = formatTikTokCaption(analysis);
-    console.log(chalk.green('✅ AI-generated caption created!'));
-    console.log(chalk.cyan('📋 Final TikTok Caption:'));
-    console.log(chalk.gray('──────────────────────────────────────'));
-    console.log(chalk.white(caption));
-    console.log(chalk.gray('──────────────────────────────────────'));
+    const { title, description, tags, category } = analysis;
     
+    // Create hashtags string
+    const hashtagString = tags.map(tag => `#${tag}`).join(' ');
+    
+    // Generate caption
+    let caption = '';
+    
+    if (title && title.length > 0) {
+      caption += `🔥 ${title}\n\n`;
+    }
+    
+    if (description && description.length > 0) {
+      caption += `${description}\n\n`;
+    }
+    
+    caption += hashtagString;
+    
+    // Ensure caption is not too long (TikTok limit is around 300 chars)
+    if (caption.length > 280) {
+      caption = caption.substring(0, 280) + '...';
+    }
+    
+    console.log(chalk.green('✅ Caption generated successfully!'));
     return caption;
     
   } catch (err) {
-    console.error(chalk.red(`❌ AI caption generation failed: ${err.message}`));
-    return getFallbackCaption(title, description);
-  }
-}
-
-function formatTikTokCaption(analysis) {
-  const { title, description, tags, mood } = analysis;
-  
-  let caption = '';
-  
-  // Add engaging title
-  if (title) {
-    caption += `${title}\n\n`;
-  }
-  
-  // Add description with emojis
-  if (description) {
-    let desc = description;
+    console.error(chalk.red(`❌ Caption generation failed: ${err.message}`));
     
-    // Add mood-based emojis
-    if (mood === 'energetic') desc += ' 🔥';
-    else if (mood === 'funny') desc += ' 😂';
-    else if (mood === 'chill') desc += ' ✨';
-    else if (mood === 'dramatic') desc += ' 🎬';
-    else desc += ' ❤️';
-    
-    caption += `${desc}\n\n`;
+    // Fallback caption
+    const fallbackCaption = "🔥 Amazing content! Drop a ❤️ if you're vibing! #viral #fyp #trending #foryou";
+    console.log(chalk.yellow('🔄 Using fallback caption'));
+    return fallbackCaption;
   }
-  
-  // Add hashtags
-  if (tags && tags.length > 0) {
-    caption += tags.join(' ');
-  } else {
-    caption += '#viral #fyp #trending #foryou';
-  }
-  
-  return caption;
 }
 
-function getFallbackCaption(title, description) {
-  const fallbackCaptions = [
-    "🔥 This hits different! Drop a ❤️ if you're vibing!\n\n#viral #fyp #trending #foryou #amazing",
-    "✨ Can't stop watching this! What do you think?\n\n#viral #fyp #trending #foryou #content",
-    "🎯 This is exactly what I needed today!\n\n#viral #fyp #trending #foryou #mood",
-    "💯 Absolutely incredible! Save this for later!\n\n#viral #fyp #trending #foryou #save"
-  ];
-  
-  const randomCaption = fallbackCaptions[Math.floor(Math.random() * fallbackCaptions.length)];
-  console.log(chalk.blue('🔄 Using fallback caption'));
-  return randomCaption;
-}
-
-// ============================================================================
-// 🌐 MULTI-PLATFORM VIDEO FETCHER FUNCTION
-// ============================================================================
-
+/**
+ * Get Multi-Platform Videos Function
+ */
 async function getMultiPlatformVideos(sources, options = {}) {
   const downloader = new MultiPlatformDownloader();
   const results = [];
 
   console.log(chalk.cyan('🌐 Multi-Platform Video Fetcher Started'));
-  console.log(chalk.gray(`Supported platforms: YouTube, TikTok, Instagram, Facebook, Twitter`));
+  console.log(chalk.gray(`Supported platforms: ${downloader.getSupportedPlatforms().join(', ')}`));
 
   try {
     if (typeof sources === 'string') {
@@ -1247,9 +1297,11 @@ async function getMultiPlatformVideos(sources, options = {}) {
         results.push(result);
       } else {
         console.log(chalk.blue(`🔍 Searching for: "${sources}"`));
-        
-        // Enhanced search with relevance scoring
-        const searchResults = await searchWithRelevanceScoring(sources, options.limit || 1);
+        const searchResults = await downloader.searchAndDownload(
+          sources, 
+          options.platform || 'YouTube', 
+          options.limit || 1
+        );
         results.push(...searchResults);
       }
     } else if (Array.isArray(sources)) {
@@ -1258,16 +1310,8 @@ async function getMultiPlatformVideos(sources, options = {}) {
       }
       
       console.log(chalk.blue(`📥 Downloading ${sources.length} videos...`));
-      
-      for (const url of sources) {
-        try {
-          const result = await downloader.downloadVideo(url, options);
-          results.push(result);
-        } catch (err) {
-          console.error(chalk.red(`❌ Failed to download ${url}: ${err.message}`));
-          results.push({ url, error: err.message });
-        }
-      }
+      const downloadResults = await downloader.downloadMultiple(sources, options);
+      results.push(...downloadResults);
     } else {
       throw new Error('Invalid sources format. Provide URL string or array of URLs.');
     }
@@ -1288,132 +1332,14 @@ async function getMultiPlatformVideos(sources, options = {}) {
   }
 }
 
-// Enhanced search with relevance scoring
-async function searchWithRelevanceScoring(query, limit = 1) {
-  try {
-    console.log(chalk.blue(`🔍 Searching YouTube for: "${query}"`));
-    
-    const searchResults = await yts(query);
-    const videos = searchResults.videos;
-    
-    if (!videos || videos.length === 0) {
-      throw new Error(`No videos found for query: ${query}`);
-    }
-    
-    console.log(chalk.green(`🎯 Found ${videos.length} total results`));
-    
-    // Calculate relevance scores
-    const scoredVideos = videos.map((video, index) => {
-      const score = calculateRelevanceScore(video, query, index);
-      return {
-        ...video,
-        relevanceScore: score,
-        searchRank: index + 1
-      };
-    });
-    
-    // Sort by relevance score (highest first)
-    scoredVideos.sort((a, b) => b.relevanceScore - a.relevanceScore);
-    
-    // Show top matches
-    console.log(chalk.cyan('📊 Top matches:'));
-    scoredVideos.slice(0, Math.min(3, scoredVideos.length)).forEach((video, i) => {
-      console.log(chalk.gray(`   ${i + 1}. "${video.title}" (Score: ${video.relevanceScore})`));
-    });
-    
-    // Select top videos
-    const selectedVideos = scoredVideos.slice(0, limit);
-    console.log(chalk.green(`✅ Selected ${selectedVideos.length} video(s) matching: "${query}"`));
-    
-    // Download selected videos
-    const downloader = new MultiPlatformDownloader();
-    const downloadResults = [];
-    
-    for (const video of selectedVideos) {
-      try {
-        console.log(chalk.cyan(`📥 Processing: ${video.title}`));
-        console.log(chalk.gray(`🎯 Relevance score: ${video.relevanceScore}`));
-        console.log(chalk.gray(`⏱️ Duration: ${video.duration.timestamp}`));
-        
-        const downloadResult = await downloader.downloadVideo(video.url);
-        downloadResults.push({
-          ...downloadResult,
-          relevanceScore: video.relevanceScore,
-          searchRank: video.searchRank,
-          searchQuery: query
-        });
-      } catch (err) {
-        console.error(chalk.red(`❌ Failed to download ${video.title}: ${err.message}`));
-      }
-    }
-    
-    return downloadResults;
-    
-  } catch (err) {
-    console.error(chalk.red(`❌ Enhanced search failed: ${err.message}`));
-    throw err;
-  }
-}
-
-function calculateRelevanceScore(video, query, searchRank) {
-  let score = 0;
-  const queryWords = query.toLowerCase().split(' ');
-  const title = video.title.toLowerCase();
-  const description = (video.description || '').toLowerCase();
-  
-  // Title keyword matching (highest weight)
-  queryWords.forEach(word => {
-    if (title.includes(word)) {
-      score += 10;
-      // Bonus for exact word match
-      if (title.split(' ').includes(word)) {
-        score += 5;
-      }
-    }
-  });
-  
-  // Description keyword matching
-  queryWords.forEach(word => {
-    if (description.includes(word)) {
-      score += 3;
-    }
-  });
-  
-  // Duration preference (30 seconds to 10 minutes)
-  const duration = video.duration?.seconds || 0;
-  if (duration >= 30 && duration <= 600) {
-    score += 5;
-  } else if (duration > 600) {
-    score -= 2; // Penalty for very long videos
-  }
-  
-  // View count bonus (if available)
-  if (video.views) {
-    const viewCount = parseInt(video.views.replace(/[^0-9]/g, '')) || 0;
-    if (viewCount > 100000) score += 3;
-    if (viewCount > 1000000) score += 2;
-  }
-  
-  // Search rank penalty (lower rank = higher penalty)
-  score -= Math.floor(searchRank / 5);
-  
-  // Recent upload bonus
-  if (video.ago && (video.ago.includes('day') || video.ago.includes('week'))) {
-    score += 2;
-  }
-  
-  return Math.max(0, score);
-}
-
-// ============================================================================
-// 🤖 MAIN BOT FUNCTION
-// ============================================================================
-
+/**
+ * Main TikTok Bot Function
+ */
 async function runTikTokBot() {
   console.log(chalk.blueBright("📱 TikTok All-in-One Bot"));
   console.log(chalk.gray("All functions integrated in one script!"));
-  console.log(chalk.green("🎯 Enhanced Search & AI Analysis!"));
-  console.log(chalk.magenta("🤖 Multi-frame Video Analysis with Gemini!"));
+  console.log(chalk.magenta("🎯 Enhanced Search & AI Analysis!"));
+  console.log(chalk.green("🤖 Multi-frame Video Analysis with Gemini!"));
 
   const { inputType } = await inquirer.prompt([
     {
@@ -1428,6 +1354,7 @@ async function runTikTokBot() {
   ]);
 
   let results = [];
+  let videoAnalysis = null;
 
   if (inputType === "🔗 Provide direct URLs") {
     const { urls } = await inquirer.prompt([
@@ -1443,12 +1370,6 @@ async function runTikTokBot() {
     
     try {
       results = await getMultiPlatformVideos(urlList, { quality: 1080 });
-      
-      results = results.map(result => ({
-        ...result,
-        videoId: result.actualVideoId || result.id || result.videoId
-      }));
-      
     } catch (err) {
       console.error(chalk.red(`❌ Failed to download videos: ${err.message}`));
       return;
@@ -1465,30 +1386,14 @@ async function runTikTokBot() {
     ]);
 
     console.log(chalk.cyan(`🎯 Searching for videos that match: "${searchQuery}"`));
-    console.log(chalk.gray("💡 Tip: Use specific keywords for better matching"));
-
+    console.log(chalk.gray('💡 Tip: Use specific keywords for better matching'));
+    
     try {
       results = await getMultiPlatformVideos(searchQuery, {
         platform: "YouTube",
         limit: 1,
         quality: 1080
       });
-
-      results = results.map(result => ({
-        ...result,
-        videoId: result.actualVideoId || result.id || result.videoId,
-        searchQuery: searchQuery
-      }));
-
-      if (results.length > 0) {
-        const video = results[0];
-        console.log(chalk.green(`✅ Found matching video:`));
-        console.log(chalk.blue(`   📺 Title: ${video.title}`));
-        console.log(chalk.gray(`   🎯 Relevance Score: ${video.relevanceScore || 'N/A'}`));
-        console.log(chalk.gray(`   📊 Search Rank: #${video.searchRank || 1}`));
-        console.log(chalk.gray(`   ⏱️ Duration: ${video.duration || 'Unknown'}s`));
-      }
-      
     } catch (err) {
       console.error(chalk.red(`❌ Failed to search and download: ${err.message}`));
       return;
@@ -1503,128 +1408,80 @@ async function runTikTokBot() {
   // Initialize cleanup utility
   const videoCleanup = new VideoCleanup();
   
+  // Process the first video
   const video = results[0];
   const videoId = video.videoId || video.actualVideoId || video.id;
+  
+  // Protect the current video file from cleanup
+  videoCleanup.protectFile(video.localPath, 60); // Protect for 60 minutes
+  
+  // Perform cleanup of old files (but not the current one)
+  console.log(chalk.cyan("🧹 Performing cleanup of old files..."));
+  await videoCleanup.cleanupOldFilesExceptCurrent(video.localPath, 2);
+
   console.log(chalk.cyan(`🎬 Processing: ${video.title}`));
   console.log(chalk.gray(`📱 Platform: ${video.platform}`));
   console.log(chalk.gray(`📁 File: ${video.localPath}`));
   console.log(chalk.gray(`🆔 Video ID: ${videoId}`));
-  
-  if (video.searchQuery) {
-    console.log(chalk.magenta(`🔍 Search Query: "${video.searchQuery}"`));
-  }
-
-  // PROTECT THE DOWNLOADED FILE FROM CLEANUP
-  if (video.localPath) {
-    videoCleanup.protectFile(video.localPath, 60);
-  }
-
-  // Perform cleanup of OLD files only
-  console.log(chalk.cyan("🧹 Performing cleanup of old files..."));
-  await videoCleanup.cleanupOldFilesExceptCurrent(videoId, 30);
 
   let uploadSuccess = false;
 
   try {
     const rawPath = video.localPath;
     
-    // Enhanced file verification
     if (!fs.existsSync(rawPath)) {
-      console.error(chalk.red(`❌ Input video file does not exist: ${rawPath}`));
-      
-      console.log(chalk.yellow('🔍 Searching for video file with enhanced detection...'));
-      const videoDir = path.dirname(rawPath);
-      
-      if (fs.existsSync(videoDir)) {
-        const files = fs.readdirSync(videoDir).filter(file => {
-          const lowerFile = file.toLowerCase();
-          return !lowerFile.endsWith('.part') &&
-                 !lowerFile.includes('.tmp') &&
-                 (lowerFile.endsWith('.mp4') || 
-                  lowerFile.endsWith('.webm') || 
-                  lowerFile.endsWith('.mkv') ||
-                  lowerFile.endsWith('.avi') ||
-                  lowerFile.endsWith('.mov'));
-        });
-        
-        console.log(chalk.gray(`📁 Available video files: ${files.join(', ')}`));
-        
-        let matchingFiles = files.filter(file => {
-          const lowerFile = file.toLowerCase();
-          const lowerVideoId = videoId.toLowerCase();
-          return lowerFile.includes(lowerVideoId);
-        });
-        
-        if (matchingFiles.length === 0) {
-          const platform = video.platform.toLowerCase();
-          matchingFiles = files.filter(file => {
-            const lowerFile = file.toLowerCase();
-            return lowerFile.startsWith(platform);
-          });
-        }
-        
-        if (matchingFiles.length === 0 && files.length > 0) {
-          console.log(chalk.yellow('⚠️ No specific matches found, using most recent file'));
-          const filesWithStats = files.map(file => {
-            const filePath = path.join(videoDir, file);
-            const stats = fs.statSync(filePath);
-            return { file, mtime: stats.mtime };
-          }).sort((a, b) => b.mtime - a.mtime);
-          
-          matchingFiles = [filesWithStats[0].file];
-        }
-        
-        if (matchingFiles.length > 0) {
-          const foundFile = path.join(videoDir, matchingFiles[0]);
-          console.log(chalk.green(`✅ Found matching file: ${foundFile}`));
-          video.localPath = foundFile;
-          videoCleanup.protectFile(foundFile, 60);
-        } else {
-          throw new Error(`❌ No video file found for ID: ${videoId}`);
-        }
-      } else {
-        throw new Error(`❌ Video directory does not exist: ${videoDir}`);
-      }
+      throw new Error(`❌ Input video file does not exist: ${rawPath}`);
     }
     
-    const editedPath = path.join(DIRS.edited, `${videoId}-edited.mp4`);
-    const finalPath = path.join(DIRS.edited, `${videoId}-final.mp4`);
+    const editedPath = path.join(__dirname, 'videos/edited', `${videoId}-edited.mp4`);
+    const finalPath = path.join(__dirname, 'videos/edited', `${videoId}-final.mp4`);
 
     console.log(chalk.yellow("🎬 Editing video..."));
-    await editVideo(video.localPath, editedPath);
+    await editVideo(rawPath, `${videoId}-edited.mp4`);
 
-    console.log(chalk.yellow("🎵 Processing video audio..."));
+    console.log(chalk.yellow("🎵 Processing video with original audio..."));
     await processVideoAudio(editedPath, finalPath);
 
-    console.log(chalk.yellow("🤖 Analyzing video and generating AI-powered caption..."));
-    const caption = await generateCaption(
+    // AI Video Analysis
+    console.log(chalk.yellow("🤖 Analyzing video content with Gemini AI..."));
+    const videoAnalyzer = new VideoAnalyzer();
+    videoAnalysis = await videoAnalyzer.analyzeVideoContent(
       finalPath, 
       video.title || '', 
       video.description || ''
     );
+
+    console.log(chalk.yellow("📝 Generating TikTok caption..."));
+    const caption = await generateCaption(videoAnalysis);
+
+    // Display final caption
+    console.log(chalk.cyan('📋 Final TikTok Caption:'));
+    console.log(chalk.gray('──────────────────────────────────────'));
+    console.log(chalk.white(caption));
+    console.log(chalk.gray('──────────────────────────────────────'));
 
     console.log(chalk.yellow("📤 Uploading to TikTok..."));
     await uploadToTikTok(finalPath, caption);
 
     uploadSuccess = true;
     console.log(chalk.green("🚀 Video posted successfully!"));
+    
+    // Display summary
     console.log(chalk.cyan(`📊 Summary:`));
     console.log(chalk.gray(`   Title: ${video.title}`));
     console.log(chalk.gray(`   Platform: ${video.platform}`));
-    if (video.searchQuery) {
-      console.log(chalk.gray(`   Search Query: "${video.searchQuery}"`));
-      console.log(chalk.gray(`   Relevance Score: ${video.relevanceScore || 'N/A'}`));
-    }
-    console.log(chalk.gray(`   AI Generated Caption:`));
-    console.log(chalk.blue(`   ${caption.split('\n')[0]}...`));
+    console.log(chalk.gray(`   Category: ${videoAnalysis?.category || 'Unknown'}`));
+    console.log(chalk.gray(`   Caption: ${caption}`));
 
   } catch (err) {
     uploadSuccess = false;
     console.error(chalk.red(`❌ Error processing video: ${err.message}`));
   } finally {
+    // Cleanup after processing
     console.log(chalk.cyan("🧹 Performing post-processing cleanup..."));
-    await videoCleanup.cleanupAfterUpload(videoId, uploadSuccess);
+    await videoCleanup.cleanupOldFilesExceptCurrent('', 0); // Clean all old files
     
+    // Show final storage stats
     const finalStats = await videoCleanup.getStorageStats();
     if (finalStats) {
       console.log(chalk.cyan(`📊 Storage Usage:`));
@@ -1635,10 +1492,9 @@ async function runTikTokBot() {
   }
 }
 
-// ============================================================================
-// 🎯 MAIN FUNCTION
-// ============================================================================
-
+/**
+ * Main Function
+ */
 async function main() {
   console.log(chalk.blueBright("🤖 TikTok All-in-One Bot"));
   console.log(chalk.gray("All functions integrated in one script!"));
@@ -1666,7 +1522,7 @@ async function main() {
       case "🧹 Cleanup files only":
         console.log(chalk.cyan("🧹 Starting cleanup..."));
         const cleanup = new VideoCleanup();
-        await cleanup.cleanupOldFilesExceptCurrent('', 0); // Clean all old files
+        await cleanup.cleanupOldFilesExceptCurrent('', 0);
         console.log(chalk.green("✅ Cleanup completed!"));
         break;
         
@@ -1685,22 +1541,18 @@ async function main() {
   }
 }
 
-// ============================================================================
-// 🚀 EXPORT & RUN
-// ============================================================================
-
 // Export classes and functions for external use
 module.exports = {
   main,
   runTikTokBot,
-  getMultiPlatformVideos,
-  generateCaption,
-  uploadToTikTok,
-  editVideo,
-  processVideoAudio,
   MultiPlatformDownloader,
   VideoAnalyzer,
-  VideoCleanup
+  VideoCleanup,
+  editVideo,
+  processVideoAudio,
+  uploadToTikTok,
+  generateCaption,
+  getMultiPlatformVideos
 };
 
 // Only run if this file is executed directly
@@ -1710,7 +1562,3 @@ if (require.main === module) {
     process.exit(1);
   });
 }
-
-// ============================================================================
-// 🎉 END OF ALL-IN-ONE TIKTOK BOT
-// ============================================================================

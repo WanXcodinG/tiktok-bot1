@@ -88,7 +88,7 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Download video from any supported platform
+   * Download video from any supported platform - FIXED
    */
   async downloadVideo(url, options = {}) {
     try {
@@ -103,8 +103,9 @@ class MultiPlatformDownloader {
       const videoInfo = await this.getVideoInfo(url);
       const videoId = videoInfo.id;
       
-      // Create output filename with platform prefix
-      const outputFilename = `${platform.toLowerCase()}_${videoId}.%(ext)s`;
+      // Create unique filename with timestamp to avoid conflicts
+      const timestamp = Date.now();
+      const outputFilename = `${platform.toLowerCase()}_${videoId}_${timestamp}.%(ext)s`;
       const outputTemplate = path.join(this.outputDir, outputFilename);
       
       console.log(chalk.yellow(`⬇️ Downloading: ${videoInfo.title}`));
@@ -132,19 +133,35 @@ class MultiPlatformDownloader {
         throw new Error(`Download failed: ${ytDlpError.message}`);
       }
       
-      // Find the downloaded file
-      const downloadedFile = await this.findDownloadedFile(videoId, platform);
+      // Find the downloaded file - IMPROVED
+      const downloadedFile = await this.findDownloadedFile(videoId, platform, timestamp);
       
       if (downloadedFile && fs.existsSync(downloadedFile)) {
         const stats = fs.statSync(downloadedFile);
         console.log(chalk.green(`✅ Downloaded successfully! Size: ${(stats.size / 1024 / 1024).toFixed(2)}MB`));
         console.log(chalk.green(`📁 File location: ${downloadedFile}`));
         
+        // Create a consistent filename for easier reference
+        const finalFilename = `${platform.toLowerCase()}_${videoId}.mp4`;
+        const finalPath = path.join(this.outputDir, finalFilename);
+        
+        // If the downloaded file has a different name, rename it
+        if (downloadedFile !== finalPath) {
+          try {
+            await fs.move(downloadedFile, finalPath, { overwrite: true });
+            console.log(chalk.blue(`📝 Renamed to: ${finalFilename}`));
+          } catch (renameErr) {
+            console.log(chalk.yellow(`⚠️ Could not rename file: ${renameErr.message}`));
+            // Use the original downloaded file path
+          }
+        }
+        
         return {
           ...videoInfo,
-          localPath: downloadedFile,
+          localPath: fs.existsSync(finalPath) ? finalPath : downloadedFile,
           fileSize: stats.size,
-          alreadyExists: false
+          alreadyExists: false,
+          actualVideoId: videoId // Store the actual video ID used
         };
       } else {
         throw new Error('Download completed but file not found');
@@ -153,6 +170,95 @@ class MultiPlatformDownloader {
     } catch (err) {
       console.error(chalk.red(`❌ Download failed: ${err.message}`));
       throw err;
+    }
+  }
+
+  /**
+   * Find downloaded file by searching for files with video ID - IMPROVED
+   */
+  async findDownloadedFile(videoId, platform, timestamp) {
+    try {
+      const files = fs.readdirSync(this.outputDir);
+      
+      // Look for files with the exact pattern first
+      const exactMatches = files.filter(file => {
+        const lowerFile = file.toLowerCase();
+        return lowerFile.includes(videoId.toLowerCase()) && 
+               lowerFile.includes(timestamp.toString()) &&
+               (lowerFile.endsWith('.mp4') || 
+                lowerFile.endsWith('.webm') || 
+                lowerFile.endsWith('.mkv'));
+      });
+      
+      if (exactMatches.length > 0) {
+        return path.join(this.outputDir, exactMatches[0]);
+      }
+      
+      // Look for files containing the video ID
+      const videoIdMatches = files.filter(file => {
+        const lowerFile = file.toLowerCase();
+        const lowerVideoId = videoId.toLowerCase();
+        
+        return lowerFile.includes(lowerVideoId) &&
+               (lowerFile.endsWith('.mp4') || 
+                lowerFile.endsWith('.webm') || 
+                lowerFile.endsWith('.mkv'));
+      });
+      
+      if (videoIdMatches.length > 0) {
+        // Return the most recent file
+        const sortedFiles = videoIdMatches.map(file => ({
+          name: file,
+          path: path.join(this.outputDir, file),
+          stats: fs.statSync(path.join(this.outputDir, file))
+        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
+        
+        return sortedFiles[0].path;
+      }
+      
+      // Look for files with platform prefix
+      const platformMatches = files.filter(file => {
+        const lowerFile = file.toLowerCase();
+        const lowerPlatform = platform.toLowerCase();
+        
+        return lowerFile.includes(lowerPlatform) &&
+               (lowerFile.endsWith('.mp4') || 
+                lowerFile.endsWith('.webm') || 
+                lowerFile.endsWith('.mkv'));
+      });
+      
+      if (platformMatches.length > 0) {
+        // Return the most recent file
+        const sortedFiles = platformMatches.map(file => ({
+          name: file,
+          path: path.join(this.outputDir, file),
+          stats: fs.statSync(path.join(this.outputDir, file))
+        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
+        
+        console.log(chalk.yellow(`⚠️ Using most recent ${platform} file: ${sortedFiles[0].name}`));
+        return sortedFiles[0].path;
+      }
+      
+      // If no matching files, return the most recent video file
+      const videoFiles = files.filter(file => 
+        file.endsWith('.mp4') || file.endsWith('.webm') || file.endsWith('.mkv')
+      );
+      
+      if (videoFiles.length > 0) {
+        const sortedFiles = videoFiles.map(file => ({
+          name: file,
+          path: path.join(this.outputDir, file),
+          stats: fs.statSync(path.join(this.outputDir, file))
+        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
+        
+        console.log(chalk.yellow(`⚠️ Using most recent video file: ${sortedFiles[0].name}`));
+        return sortedFiles[0].path;
+      }
+      
+      return null;
+    } catch (err) {
+      console.error(chalk.red(`❌ Error finding downloaded file: ${err.message}`));
+      return null;
     }
   }
 
@@ -195,60 +301,6 @@ class MultiPlatformDownloader {
     }
     
     return cleanedCommand;
-  }
-
-  /**
-   * Find downloaded file by searching for files with video ID
-   */
-  async findDownloadedFile(videoId, platform) {
-    try {
-      const files = fs.readdirSync(this.outputDir);
-      
-      // Look for files containing the video ID
-      const matchingFiles = files.filter(file => {
-        const lowerFile = file.toLowerCase();
-        const lowerVideoId = videoId.toLowerCase();
-        const lowerPlatform = platform.toLowerCase();
-        
-        return (lowerFile.includes(lowerVideoId) || 
-                lowerFile.includes(lowerPlatform)) &&
-               (lowerFile.endsWith('.mp4') || 
-                lowerFile.endsWith('.webm') || 
-                lowerFile.endsWith('.mkv'));
-      });
-      
-      if (matchingFiles.length > 0) {
-        // Return the most recent file
-        const sortedFiles = matchingFiles.map(file => ({
-          name: file,
-          path: path.join(this.outputDir, file),
-          stats: fs.statSync(path.join(this.outputDir, file))
-        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
-        
-        return sortedFiles[0].path;
-      }
-      
-      // If no matching files, return the most recent video file
-      const videoFiles = files.filter(file => 
-        file.endsWith('.mp4') || file.endsWith('.webm') || file.endsWith('.mkv')
-      );
-      
-      if (videoFiles.length > 0) {
-        const sortedFiles = videoFiles.map(file => ({
-          name: file,
-          path: path.join(this.outputDir, file),
-          stats: fs.statSync(path.join(this.outputDir, file))
-        })).sort((a, b) => b.stats.mtime - a.stats.mtime);
-        
-        console.log(chalk.yellow(`⚠️ Using most recent video file: ${sortedFiles[0].name}`));
-        return sortedFiles[0].path;
-      }
-      
-      return null;
-    } catch (err) {
-      console.error(chalk.red(`❌ Error finding downloaded file: ${err.message}`));
-      return null;
-    }
   }
 
   /**

@@ -92,7 +92,7 @@ async function runInteractiveBot() {
       results = results.map(result => ({
         ...result,
         category: category,
-        videoId: result.id
+        videoId: result.actualVideoId || result.id || result.videoId
       }));
 
       // Set hashtags based on category
@@ -158,7 +158,7 @@ async function runInteractiveBot() {
       results = results.map(result => ({
         ...result,
         category: category,
-        videoId: result.id
+        videoId: result.actualVideoId || result.id || result.videoId
       }));
 
       // Set hashtags based on category
@@ -192,7 +192,7 @@ async function runInteractiveBot() {
 
   // Process the first video
   const video = results[0];
-  const videoId = video.videoId || video.id;
+  const videoId = video.videoId || video.actualVideoId || video.id;
   console.log(chalk.cyan(`🎬 Processing: ${video.title}`));
   console.log(chalk.gray(`📱 Platform: ${video.platform}`));
   console.log(chalk.gray(`📁 File: ${video.localPath}`));
@@ -212,6 +212,13 @@ async function runInteractiveBot() {
 
   try {
     const rawPath = video.localPath;
+    
+    // Verify the raw file exists
+    const fs = require('fs');
+    if (!fs.existsSync(rawPath)) {
+      throw new Error(`❌ Input video file does not exist: ${rawPath}`);
+    }
+    
     const editedPath = `./videos/edited/${videoId}-edited.mp4`;
     const finalPath = `./videos/edited/${videoId}-final.mp4`;
 

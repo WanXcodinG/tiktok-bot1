@@ -106,7 +106,7 @@ class VideoCleanup {
   }
 
   /**
-   * Clean up files related to a specific video ID
+   * Clean up files related to a specific video ID - IMPROVED
    */
   async cleanupVideoFiles(videoId, keepOriginal = false) {
     try {
@@ -122,7 +122,12 @@ class VideoCleanup {
           const files = fs.readdirSync(dir);
           
           for (const file of files) {
-            if (file.includes(videoId)) {
+            // Check for various patterns that might contain the video ID
+            const fileContainsId = file.includes(videoId) || 
+                                  file.includes(videoId.replace(/[^a-zA-Z0-9]/g, '')) ||
+                                  file.split('_').some(part => part === videoId);
+            
+            if (fileContainsId) {
               const filePath = path.join(dir, file);
               
               // Skip original file if keepOriginal is true

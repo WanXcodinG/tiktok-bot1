@@ -110,20 +110,23 @@ class MultiPlatformDownloader {
       console.log(chalk.yellow(`⬇️ Downloading: ${videoInfo.title}`));
       console.log(chalk.gray(`📁 Output template: ${outputTemplate}`));
       
-      // Download options based on platform
+      // Download options based on platform - FIXED: Remove duplicates
       const downloadOptions = this.getDownloadOptions(platform, options);
       
-      // Execute download with proper error handling
+      // Execute download with proper error handling - FIXED: Clean command array
       const command = [
         url,
         '-o', outputTemplate,
         ...downloadOptions
       ];
       
-      console.log(chalk.gray(`🔧 Command: yt-dlp ${command.join(' ')}`));
+      // Remove any duplicate options
+      const cleanCommand = this.cleanCommandArray(command);
+      
+      console.log(chalk.gray(`🔧 Command: yt-dlp ${cleanCommand.join(' ')}`));
       
       try {
-        await this.ytDlp.exec(command);
+        await this.ytDlp.exec(cleanCommand);
       } catch (ytDlpError) {
         console.error(chalk.red(`❌ yt-dlp error: ${ytDlpError.message}`));
         throw new Error(`Download failed: ${ytDlpError.message}`);
@@ -151,6 +154,47 @@ class MultiPlatformDownloader {
       console.error(chalk.red(`❌ Download failed: ${err.message}`));
       throw err;
     }
+  }
+
+  /**
+   * Clean command array to remove duplicates and invalid options
+   */
+  cleanCommandArray(command) {
+    const cleanedCommand = [];
+    const seenOptions = new Set();
+    
+    for (let i = 0; i < command.length; i++) {
+      const current = command[i];
+      
+      // Skip empty or invalid entries
+      if (!current || current.trim() === '') {
+        continue;
+      }
+      
+      // Handle option-value pairs
+      if (current.startsWith('--')) {
+        if (!seenOptions.has(current)) {
+          seenOptions.add(current);
+          cleanedCommand.push(current);
+          
+          // Check if next item is a value for this option
+          if (i + 1 < command.length && !command[i + 1].startsWith('--')) {
+            cleanedCommand.push(command[i + 1]);
+            i++; // Skip the value in next iteration
+          }
+        } else {
+          // Skip duplicate option and its value if present
+          if (i + 1 < command.length && !command[i + 1].startsWith('--')) {
+            i++; // Skip the value too
+          }
+        }
+      } else {
+        // Non-option arguments (URL, output path, etc.)
+        cleanedCommand.push(current);
+      }
+    }
+    
+    return cleanedCommand;
   }
 
   /**
@@ -208,11 +252,11 @@ class MultiPlatformDownloader {
   }
 
   /**
-   * Get platform-specific download options
+   * Get platform-specific download options - FIXED: No duplicates
    */
   getDownloadOptions(platform, userOptions = {}) {
+    // Base options that apply to all platforms
     const baseOptions = [
-      '--format', 'best[height<=1080]/best',
       '--merge-output-format', 'mp4',
       '--no-playlist',
       '--no-warnings',
@@ -220,42 +264,41 @@ class MultiPlatformDownloader {
       '--no-check-certificate'
     ];
 
+    // Platform-specific options
     const platformOptions = {
       'YouTube': [
-        '--format', 'best[ext=mp4][height<=1080]/best[ext=mp4]/best',
-        '--embed-subs',
-        '--write-auto-sub'
+        '--format', 'best[ext=mp4][height<=1080]/best[ext=mp4]/best'
       ],
       'TikTok': [
         '--format', 'best',
-        '--no-check-certificate',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       ],
       'Instagram': [
-        '--format', 'best',
-        '--no-check-certificate'
+        '--format', 'best'
       ],
       'Facebook': [
-        '--format', 'best',
-        '--no-check-certificate'
+        '--format', 'best'
       ],
       'Twitter': [
-        '--format', 'best',
-        '--no-check-certificate'
+        '--format', 'best'
       ]
     };
 
+    // Start with base options
     let options = [...baseOptions];
     
+    // Add platform-specific options
     if (platformOptions[platform]) {
-      // Replace base format option with platform-specific one
-      options = options.filter(opt => opt !== 'best[height<=1080]/best');
       options.push(...platformOptions[platform]);
+    } else {
+      // Default format for unknown platforms
+      options.push('--format', 'best[height<=1080]/best');
     }
 
     // Add user-specified options
     if (userOptions.quality) {
-      options = options.filter(opt => !opt.includes('height<='));
+      // Remove existing format options and add custom quality
+      options = options.filter(opt => !opt.includes('--format') && !opt.includes('best'));
       options.push('--format', `best[height<=${userOptions.quality}]/best`);
     }
     

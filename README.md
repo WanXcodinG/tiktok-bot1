@@ -4,7 +4,7 @@
 
 ## ✨ Fitur (Hanya 3 Fungsi)
 
-1. **🔑 TikTok Login** - Auto-login dengan cookies
+1. **🔑 TikTok Login** - Auto-login dengan cookies dari `config/cookies.json`
 2. **📤 Video Upload** - Upload file lokal ke TikTok  
 3. **🤖 AI Caption** - Generate caption dengan Gemini AI
 
@@ -43,11 +43,20 @@ GEMINI_API_KEY=your_gemini_api_key_here
 python tiktok_uploader.py
 ```
 
+## 🍪 Cookie Management
+
+Script ini menggunakan `config/cookies.json` untuk menyimpan session TikTok:
+
+- **First run:** Login manual sekali, cookies akan disimpan otomatis
+- **Next runs:** Login otomatis menggunakan saved cookies
+- **Reset login:** Hapus isi `config/cookies.json` (buat jadi `[]`)
+
 ## 🎯 Usage
 
 ```
 🎯 Simple TikTok Uploader (Python + Selenium)
 Features: TikTok Login + Video Upload + AI Captions
+Cookies: config/cookies.json
 --------------------------------------------------
 
 📁 Enter video file path: ./my-video.mp4
@@ -68,13 +77,15 @@ Choose option (1-3): 1
 📁 Video: my-video.mp4
 📏 Size: 45.1MB
 ✍️ Caption: 🐱 These cats are pure comedy gold! 😂 #cat #funny #viral #fyp #pets #comedy
+🍪 Cookies: config/cookies.json
 ----------------------------------------
 
 🚀 Proceed with upload? (y/n): y
 
 🔑 Logging in to TikTok...
 🌐 Navigating to TikTok upload page...
-🍪 Cookies loaded
+🍪 Cookies loaded from config/cookies.json
+🔄 Refreshing page with loaded cookies...
 ✅ Already logged in!
 
 📤 Starting upload...
@@ -103,7 +114,8 @@ project/
 ├── .env                   # Environment variables
 ├── .env.example           # Template
 ├── README.md              # Documentation
-└── tiktok_cookies.pkl     # Auto-generated cookies
+└── config/
+    └── cookies.json       # TikTok session cookies (auto-generated)
 ```
 
 ## 🔧 Supported Formats
@@ -123,11 +135,11 @@ project/
 
 ## 🚨 Notes
 
-- **First run:** Login manual sekali, selanjutnya otomatis dengan cookies
+- **Cookies:** Disimpan di `config/cookies.json` (format JSON)
+- **First run:** Login manual sekali, selanjutnya otomatis
 - **File size:** Max ~100MB (TikTok limit)
 - **AI Caption:** Perlu Gemini API key (gratis)
 - **Browser:** Chrome akan terbuka untuk upload
-- **Cookies:** Disimpan otomatis untuk login berikutnya
 
 ## 🔧 Troubleshooting
 
@@ -143,7 +155,14 @@ pip install --upgrade selenium
 ```
 
 **❌ Login gagal:**
-- Hapus file `tiktok_cookies.pkl`
-- Login manual sekali lagi
+```bash
+# Reset cookies
+echo "[]" > config/cookies.json
+# Login manual sekali lagi
+```
 
-**Simple & Powerful! 🎉**
+**❌ Cookies error:**
+- Pastikan `config/cookies.json` ada dan valid JSON
+- Jika error, reset dengan: `echo "[]" > config/cookies.json`
+
+**Simple & Powerful dengan config/cookies.json! 🎉**

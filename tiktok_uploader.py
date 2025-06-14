@@ -2,7 +2,7 @@
 """
 🎯 SIMPLE TIKTOK UPLOADER - PYTHON + SELENIUM
 Hanya 3 fungsi utama:
-1. Login TikTok (dengan cookies)
+1. Login TikTok (dengan cookies dari config/cookies.json)
 2. Upload video file
 3. Generate AI caption dengan Gemini
 """
@@ -10,7 +10,6 @@ Hanya 3 fungsi utama:
 import os
 import json
 import time
-import pickle
 from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -27,8 +26,11 @@ load_dotenv()
 class TikTokUploader:
     def __init__(self):
         self.driver = None
-        self.cookies_file = "tiktok_cookies.pkl"
+        self.cookies_file = "config/cookies.json"
         self.gemini_api_key = os.getenv('GEMINI_API_KEY')
+        
+        # Ensure config directory exists
+        os.makedirs("config", exist_ok=True)
         
         # Configure Gemini AI
         if self.gemini_api_key:
@@ -63,24 +65,37 @@ class TikTokUploader:
             return False
 
     def save_cookies(self):
-        """Save cookies to file"""
+        """Save cookies to config/cookies.json"""
         try:
-            with open(self.cookies_file, 'wb') as f:
-                pickle.dump(self.driver.get_cookies(), f)
-            print("💾 Cookies saved")
+            cookies = self.driver.get_cookies()
+            with open(self.cookies_file, 'w', encoding='utf-8') as f:
+                json.dump(cookies, f, indent=2, ensure_ascii=False)
+            print(f"💾 Cookies saved to {self.cookies_file}")
         except Exception as e:
             print(f"⚠️ Failed to save cookies: {e}")
 
     def load_cookies(self):
-        """Load cookies from file"""
+        """Load cookies from config/cookies.json"""
         try:
             if os.path.exists(self.cookies_file):
-                with open(self.cookies_file, 'rb') as f:
-                    cookies = pickle.load(f)
-                for cookie in cookies:
-                    self.driver.add_cookie(cookie)
-                print("🍪 Cookies loaded")
-                return True
+                with open(self.cookies_file, 'r', encoding='utf-8') as f:
+                    cookies = json.load(f)
+                
+                # Check if cookies list is not empty
+                if cookies and len(cookies) > 0:
+                    for cookie in cookies:
+                        # Ensure required cookie fields exist
+                        if 'name' in cookie and 'value' in cookie:
+                            try:
+                                self.driver.add_cookie(cookie)
+                            except Exception as cookie_error:
+                                print(f"⚠️ Failed to add cookie {cookie.get('name', 'unknown')}: {cookie_error}")
+                                continue
+                    print(f"🍪 Cookies loaded from {self.cookies_file}")
+                    return True
+                else:
+                    print(f"📝 {self.cookies_file} is empty, will need to login manually")
+                    return False
         except Exception as e:
             print(f"⚠️ Failed to load cookies: {e}")
         return False
@@ -133,7 +148,7 @@ Just return the caption, nothing else."""
         return caption
 
     def login_tiktok(self):
-        """Login to TikTok with cookie support"""
+        """Login to TikTok with cookie support from config/cookies.json"""
         try:
             print("🌐 Navigating to TikTok upload page...")
             self.driver.get("https://www.tiktok.com/upload")
@@ -142,6 +157,7 @@ Just return the caption, nothing else."""
             # Try to load cookies first
             cookies_loaded = self.load_cookies()
             if cookies_loaded:
+                print("🔄 Refreshing page with loaded cookies...")
                 self.driver.refresh()
                 time.sleep(5)
             
@@ -311,6 +327,7 @@ def main():
     """Main interactive function"""
     print("🎯 Simple TikTok Uploader (Python + Selenium)")
     print("Features: TikTok Login + Video Upload + AI Captions")
+    print("Cookies: config/cookies.json")
     print("-" * 50)
     
     uploader = TikTokUploader()
@@ -366,6 +383,7 @@ def main():
         print(f"📏 Size: {file_size:.1f}MB")
         if caption:
             print(f"✍️ Caption: {caption}")
+        print(f"🍪 Cookies: {uploader.cookies_file}")
         print("-" * 40)
         
         # Confirm upload

@@ -1,15 +1,10 @@
 {
   "name": "simple-tiktok-uploader",
   "version": "1.0.0",
-  "main": "simple-uploader.js",
+  "main": "tiktok-uploader.js",
   "scripts": {
-    "start": "node simple-uploader.js",
-    "upload": "node simple-uploader.js"
+    "start": "node tiktok-uploader.js"
   },
-  "keywords": ["tiktok", "upload", "ai", "caption", "simple"],
-  "author": "Cyber_Jay",
-  "license": "BSD-3-Clause",
-  "description": "Simple TikTok uploader with AI caption generation - upload local video files to TikTok",
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "chalk": "^4.1.2",

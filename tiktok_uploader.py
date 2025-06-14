@@ -5,6 +5,8 @@ Hanya 3 fungsi utama:
 1. Login TikTok (dengan cookies dari config/cookies.json)
 2. Upload video file
 3. Generate AI caption dengan Gemini
+
+FIXED: Login stuck issue
 """
 
 import os
@@ -32,6 +34,12 @@ class TikTokUploader:
         # Ensure config directory exists
         os.makedirs("config", exist_ok=True)
         
+        # Initialize cookies file if not exists
+        if not os.path.exists(self.cookies_file):
+            with open(self.cookies_file, 'w', encoding='utf-8') as f:
+                json.dump([], f)
+            print(f"📝 Created empty {self.cookies_file}")
+        
         # Configure Gemini AI
         if self.gemini_api_key:
             genai.configure(api_key=self.gemini_api_key)
@@ -52,53 +60,104 @@ class TikTokUploader:
         chrome_options.add_experimental_option('useAutomationExtension', False)
         chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
         
+        # Additional options to prevent stuck
+        chrome_options.add_argument("--disable-web-security")
+        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--no-first-run")
+        chrome_options.add_argument("--disable-default-apps")
+        
         # Keep browser open for manual interaction
         chrome_options.add_experimental_option("detach", True)
         
         try:
             self.driver = webdriver.Chrome(options=chrome_options)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            
+            # Set window size
+            self.driver.set_window_size(1200, 800)
             print("✅ Chrome driver ready")
             return True
         except Exception as e:
             print(f"❌ Failed to setup driver: {e}")
             return False
 
+    def reset_cookies(self):
+        """Reset cookies file to empty array"""
+        try:
+            with open(self.cookies_file, 'w', encoding='utf-8') as f:
+                json.dump([], f, indent=2)
+            print(f"🔄 Reset {self.cookies_file} to empty")
+        except Exception as e:
+            print(f"⚠️ Failed to reset cookies: {e}")
+
     def save_cookies(self):
         """Save cookies to config/cookies.json"""
         try:
             cookies = self.driver.get_cookies()
+            # Filter out invalid cookies
+            valid_cookies = []
+            for cookie in cookies:
+                if 'name' in cookie and 'value' in cookie and cookie['name'] and cookie['value']:
+                    valid_cookies.append(cookie)
+            
             with open(self.cookies_file, 'w', encoding='utf-8') as f:
-                json.dump(cookies, f, indent=2, ensure_ascii=False)
-            print(f"💾 Cookies saved to {self.cookies_file}")
+                json.dump(valid_cookies, f, indent=2, ensure_ascii=False)
+            print(f"💾 Saved {len(valid_cookies)} cookies to {self.cookies_file}")
         except Exception as e:
             print(f"⚠️ Failed to save cookies: {e}")
 
     def load_cookies(self):
         """Load cookies from config/cookies.json"""
         try:
-            if os.path.exists(self.cookies_file):
-                with open(self.cookies_file, 'r', encoding='utf-8') as f:
-                    cookies = json.load(f)
+            if not os.path.exists(self.cookies_file):
+                print(f"📝 {self.cookies_file} not found, will create new one")
+                return False
                 
-                # Check if cookies list is not empty
-                if cookies and len(cookies) > 0:
-                    for cookie in cookies:
-                        # Ensure required cookie fields exist
-                        if 'name' in cookie and 'value' in cookie:
-                            try:
-                                self.driver.add_cookie(cookie)
-                            except Exception as cookie_error:
-                                print(f"⚠️ Failed to add cookie {cookie.get('name', 'unknown')}: {cookie_error}")
-                                continue
-                    print(f"🍪 Cookies loaded from {self.cookies_file}")
-                    return True
-                else:
-                    print(f"📝 {self.cookies_file} is empty, will need to login manually")
-                    return False
+            with open(self.cookies_file, 'r', encoding='utf-8') as f:
+                cookies = json.load(f)
+            
+            # Check if cookies list is not empty
+            if not cookies or len(cookies) == 0:
+                print(f"📝 {self.cookies_file} is empty, need manual login")
+                return False
+            
+            # Add cookies to driver
+            loaded_count = 0
+            for cookie in cookies:
+                try:
+                    # Ensure required cookie fields exist
+                    if 'name' in cookie and 'value' in cookie and cookie['name'] and cookie['value']:
+                        # Remove problematic fields
+                        clean_cookie = {
+                            'name': cookie['name'],
+                            'value': cookie['value'],
+                            'domain': cookie.get('domain', '.tiktok.com'),
+                            'path': cookie.get('path', '/'),
+                        }
+                        
+                        # Add optional fields if they exist and are valid
+                        if 'secure' in cookie:
+                            clean_cookie['secure'] = cookie['secure']
+                        if 'httpOnly' in cookie:
+                            clean_cookie['httpOnly'] = cookie['httpOnly']
+                            
+                        self.driver.add_cookie(clean_cookie)
+                        loaded_count += 1
+                except Exception as cookie_error:
+                    print(f"⚠️ Failed to add cookie {cookie.get('name', 'unknown')}: {cookie_error}")
+                    continue
+            
+            if loaded_count > 0:
+                print(f"🍪 Loaded {loaded_count} cookies from {self.cookies_file}")
+                return True
+            else:
+                print(f"❌ No valid cookies loaded from {self.cookies_file}")
+                return False
+                
         except Exception as e:
             print(f"⚠️ Failed to load cookies: {e}")
-        return False
+            return False
 
     def generate_ai_caption(self, video_description=""):
         """Generate AI caption using Gemini"""
@@ -148,43 +207,121 @@ Just return the caption, nothing else."""
         return caption
 
     def login_tiktok(self):
-        """Login to TikTok with cookie support from config/cookies.json"""
+        """Login to TikTok with improved cookie handling"""
         try:
-            print("🌐 Navigating to TikTok upload page...")
-            self.driver.get("https://www.tiktok.com/upload")
-            time.sleep(3)
+            print("🌐 Navigating to TikTok...")
             
-            # Try to load cookies first
+            # First go to TikTok main page
+            print("🔄 Loading TikTok main page...")
+            self.driver.get("https://www.tiktok.com")
+            time.sleep(5)
+            
+            # Check if we can load cookies
             cookies_loaded = self.load_cookies()
+            
             if cookies_loaded:
-                print("🔄 Refreshing page with loaded cookies...")
+                print("🔄 Refreshing with cookies...")
                 self.driver.refresh()
                 time.sleep(5)
+                
+                # Check if login worked by looking for user indicators
+                try:
+                    # Look for profile or upload indicators
+                    profile_indicators = [
+                        "[data-e2e='profile-icon']",
+                        "[data-e2e='upload-icon']", 
+                        "a[href*='/upload']",
+                        "svg[data-e2e='upload-icon']"
+                    ]
+                    
+                    for indicator in profile_indicators:
+                        try:
+                            element = WebDriverWait(self.driver, 3).until(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, indicator))
+                            )
+                            if element:
+                                print("✅ Already logged in! (Found profile indicator)")
+                                # Now go to upload page
+                                print("🔄 Navigating to upload page...")
+                                self.driver.get("https://www.tiktok.com/upload")
+                                time.sleep(5)
+                                return True
+                        except TimeoutException:
+                            continue
+                            
+                except Exception as e:
+                    print(f"⚠️ Could not verify login status: {e}")
             
-            # Check if already logged in
+            # If not logged in, go to upload page for login
+            print("🔄 Going to upload page for login...")
+            self.driver.get("https://www.tiktok.com/upload")
+            time.sleep(5)
+            
+            # Check if upload page is accessible (means logged in)
             try:
                 WebDriverWait(self.driver, 10).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
                 )
-                print("✅ Already logged in!")
+                print("✅ Already logged in! (Upload page accessible)")
                 return True
             except TimeoutException:
                 pass
             
-            # Need to login manually
-            print("🔑 Please login to TikTok manually...")
-            print("📱 You can use QR code or email/password")
-            print("⏳ Waiting for login completion...")
+            # Need manual login
+            print("\n" + "="*50)
+            print("🔑 MANUAL LOGIN REQUIRED")
+            print("="*50)
+            print("📱 Please login to TikTok manually:")
+            print("   • Use QR code scan with TikTok mobile app")
+            print("   • Or use email/password login")
+            print("   • Or use phone number login")
+            print("\n⏳ Waiting for login completion...")
+            print("   (Script will detect when you're logged in)")
+            print("="*50)
             
-            # Wait for file input to appear (indicates successful login)
-            try:
-                WebDriverWait(self.driver, 300).until(  # 5 minutes timeout
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='file']"))
-                )
+            # Wait for successful login with better detection
+            login_success = False
+            max_attempts = 60  # 5 minutes total
+            
+            for attempt in range(max_attempts):
+                try:
+                    # Check multiple indicators of successful login
+                    success_indicators = [
+                        "input[type='file']",  # Upload input
+                        "[data-e2e='upload-btn']",  # Upload button
+                        "div[data-e2e='upload-container']",  # Upload container
+                        ".upload-btn",  # Upload button class
+                    ]
+                    
+                    for indicator in success_indicators:
+                        try:
+                            element = self.driver.find_element(By.CSS_SELECTOR, indicator)
+                            if element and element.is_displayed():
+                                login_success = True
+                                break
+                        except NoSuchElementException:
+                            continue
+                    
+                    if login_success:
+                        break
+                        
+                    # Show progress
+                    if attempt % 10 == 0:
+                        remaining = max_attempts - attempt
+                        print(f"⏳ Still waiting... ({remaining*5} seconds remaining)")
+                    
+                    time.sleep(5)
+                    
+                except Exception as e:
+                    print(f"⚠️ Login check error: {e}")
+                    time.sleep(5)
+            
+            if login_success:
                 print("✅ Login successful!")
+                print("💾 Saving cookies for future use...")
                 self.save_cookies()
                 return True
-            except TimeoutException:
+            else:
                 print("❌ Login timeout. Please try again.")
                 return False
                 
@@ -213,7 +350,7 @@ Just return the caption, nothing else."""
             
             # Wait for video processing
             print("⏳ Waiting for video processing...")
-            time.sleep(10)
+            time.sleep(15)  # Increased wait time
             
             # Add caption if provided
             if caption and caption.strip():
@@ -239,7 +376,8 @@ Just return the caption, nothing else."""
                 "div[role='textbox']",
                 "[data-e2e='editor']",
                 ".public-DraftEditor-content",
-                "div[data-contents='true']"
+                "div[data-contents='true']",
+                "[data-e2e='video-caption']"
             ]
             
             caption_input = None
@@ -260,10 +398,12 @@ Just return the caption, nothing else."""
                 # Clear existing text
                 caption_input.send_keys("\ue009a")  # Ctrl+A
                 caption_input.send_keys("\ue017")   # Delete
+                time.sleep(1)
                 
                 # Type new caption
                 caption_input.send_keys(caption)
                 print(f"✅ Caption added: {caption}")
+                time.sleep(2)
             else:
                 print("⚠️ Could not find caption input field")
                 
@@ -333,6 +473,13 @@ def main():
     uploader = TikTokUploader()
     
     try:
+        # Check if user wants to reset cookies
+        if os.path.exists(uploader.cookies_file):
+            reset_choice = input("🍪 Reset saved cookies? (y/n): ").strip().lower()
+            if reset_choice in ['y', 'yes']:
+                uploader.reset_cookies()
+                print("🔄 Cookies reset, will need fresh login")
+        
         # Setup driver
         if not uploader.setup_driver():
             return

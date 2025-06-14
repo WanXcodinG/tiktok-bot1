@@ -51,6 +51,56 @@ Script ini menggunakan `config/cookies.json` untuk menyimpan session TikTok:
 - **Next runs:** Login otomatis menggunakan saved cookies
 - **Reset login:** Hapus isi `config/cookies.json` (buat jadi `[]`)
 
+## 🔧 Troubleshooting
+
+### ❌ **Browser Stuck / Tidak Mau Login**
+
+**Solusi 1: Reset Cookies**
+```bash
+python fix_cookies.py
+```
+
+**Solusi 2: Manual Reset**
+```bash
+echo "[]" > config/cookies.json
+```
+
+**Solusi 3: Hapus Cookies File**
+```bash
+rm config/cookies.json
+```
+
+### ❌ **Login Gagal Terus**
+
+1. **Tutup semua browser Chrome**
+2. **Reset cookies:**
+   ```bash
+   python fix_cookies.py
+   ```
+3. **Run ulang:**
+   ```bash
+   python tiktok_uploader.py
+   ```
+4. **Pilih "y" untuk reset cookies**
+5. **Login manual dengan QR code**
+
+### ❌ **ChromeDriver Error**
+
+**Windows:**
+- Download ChromeDriver: https://chromedriver.chromium.org/
+- Extract ke `C:\Windows\System32\` atau folder di PATH
+
+**Linux:**
+```bash
+sudo apt-get update
+sudo apt-get install chromium-chromedriver
+```
+
+### ❌ **Selenium Errors**
+```bash
+pip install --upgrade selenium
+```
+
 ## 🎯 Usage
 
 ```
@@ -58,6 +108,11 @@ Script ini menggunakan `config/cookies.json` untuk menyimpan session TikTok:
 Features: TikTok Login + Video Upload + AI Captions
 Cookies: config/cookies.json
 --------------------------------------------------
+
+🍪 Reset saved cookies? (y/n): n
+
+🔧 Setting up Chrome driver...
+✅ Chrome driver ready
 
 📁 Enter video file path: ./my-video.mp4
 
@@ -83,10 +138,12 @@ Choose option (1-3): 1
 🚀 Proceed with upload? (y/n): y
 
 🔑 Logging in to TikTok...
-🌐 Navigating to TikTok upload page...
-🍪 Cookies loaded from config/cookies.json
-🔄 Refreshing page with loaded cookies...
-✅ Already logged in!
+🌐 Navigating to TikTok...
+🔄 Loading TikTok main page...
+🍪 Loaded 15 cookies from config/cookies.json
+🔄 Refreshing with cookies...
+✅ Already logged in! (Found profile indicator)
+🔄 Navigating to upload page...
 
 📤 Starting upload...
 📁 Video: my-video.mp4 (45.1MB)
@@ -110,6 +167,7 @@ Press Enter to close browser...
 ```
 project/
 ├── tiktok_uploader.py     # ← MAIN FILE (semua kode di sini)
+├── fix_cookies.py         # ← COOKIE FIXER (jika bermasalah)
 ├── requirements.txt       # Python dependencies
 ├── .env                   # Environment variables
 ├── .env.example           # Template
@@ -141,28 +199,22 @@ project/
 - **AI Caption:** Perlu Gemini API key (gratis)
 - **Browser:** Chrome akan terbuka untuk upload
 
-## 🔧 Troubleshooting
+## 🔄 Quick Fixes
 
-**❌ ChromeDriver not found:**
-```bash
-# Download dari: https://chromedriver.chromium.org/
-# Pastikan ChromeDriver ada di PATH
-```
+**Jika stuck atau error:**
 
-**❌ Selenium errors:**
-```bash
-pip install --upgrade selenium
-```
+1. **Reset cookies:**
+   ```bash
+   python fix_cookies.py
+   ```
 
-**❌ Login gagal:**
-```bash
-# Reset cookies
-echo "[]" > config/cookies.json
-# Login manual sekali lagi
-```
+2. **Run ulang:**
+   ```bash
+   python tiktok_uploader.py
+   ```
 
-**❌ Cookies error:**
-- Pastikan `config/cookies.json` ada dan valid JSON
-- Jika error, reset dengan: `echo "[]" > config/cookies.json`
+3. **Pilih "y" untuk reset cookies**
 
-**Simple & Powerful dengan config/cookies.json! 🎉**
+4. **Login manual dengan QR code**
+
+**Fixed: Browser stuck issue! 🎉**
